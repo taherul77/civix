@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 248 249 254;
+  --fg: 17 24 39;
+  --card: 255 255 255;
+  --border: 229 231 240;
+  --muted: 100 116 139;
+  --hover: 243 244 252;
+  --sidebar: 255 255 255;
+  --sidebar-fg: 30 41 59;
+  --topbar: 255 255 255;
+}
+
+.dark {
+  --bg: 11 16 35;
+  --fg: 226 232 240;
+  --card: 19 25 48;
+  --border: 32 41 70;
+  --muted: 148 163 184;
+  --hover: 26 33 60;
+  --sidebar: 14 19 41;
+  --sidebar-fg: 203 213 225;
+  --topbar: 19 25 48;
+}
+
+html, body {
+  height: 100%;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+[dir="rtl"] body {
+  font-family: Tajawal, system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(20, 179, 163, 0.25);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 8px;
+  border: 2px solid rgb(var(--bg));
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted) / 0.5); }
+
+@layer components {
+  .card {
+    @apply rounded-2xl border bg-[rgb(var(--card))] border-[rgb(var(--border))] shadow-soft
+           dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_4px_12px_rgba(0,0,0,0.25)];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500
+           disabled:opacity-60 transition-all;
+  }
+  .label {
+    @apply text-sm font-medium text-[rgb(var(--fg))] mb-1 block;
+  }
+  .help {
+    @apply text-xs text-[rgb(var(--muted))] mt-1;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-brand-gradient text-white shadow-glow hover:shadow-glow hover:brightness-110 active:brightness-95;
+  }
+  .btn-ghost {
+    @apply text-[rgb(var(--fg))] hover:bg-[rgb(var(--hover))];
+  }
+  .btn-outline {
+    @apply border border-[rgb(var(--border))] hover:bg-[rgb(var(--hover))] hover:border-brand-500/40;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-pass { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300; }
+  .badge-fail { @apply bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300; }
+  .badge-warn { @apply bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300; }
+  .badge-info { @apply bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300; }
+  .badge-muted{ @apply bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300; }
+
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-xl w-10 h-10 text-[rgb(var(--muted))]
+           hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300
+           transition-all relative;
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-all
+           text-[rgb(var(--sidebar-fg))]/75 hover:text-brand-700 dark:hover:text-brand-300
+           hover:bg-brand-50 dark:hover:bg-brand-500/10;
+  }
+  .nav-item-active {
+    @apply bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300
+           hover:bg-brand-50 dark:hover:bg-brand-500/15;
+  }
+
+  .tooltip {
+    @apply pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3
+           whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-700 text-white text-xs
+           px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg;
+  }
+  [dir="rtl"] .tooltip {
+    @apply left-auto right-full ml-0 mr-3;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-brand-gradient;
+  }
+
+  /* Decorative chip used inside cards */
+  .glow-card {
+    @apply relative overflow-hidden;
+  }
+  .glow-card::before {
+    content: "";
+    @apply absolute -top-20 -right-20 w-48 h-48 rounded-full blur-3xl opacity-30 pointer-events-none;
+    background: radial-gradient(circle, rgba(124,92,255,0.6), transparent 70%);
+  }
+}
+
+table.civix {
+  @apply w-full text-sm border-collapse;
+}
+table.civix th {
+  @apply text-left text-[10px] uppercase tracking-wider text-[rgb(var(--muted))] font-semibold py-2.5 px-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--bg))]/50;
+}
+table.civix td {
+  @apply py-3 px-3 border-b border-[rgb(var(--border))] align-middle;
+}
+table.civix tr:hover td {
+  background: rgb(var(--hover));
+}
+
+/* Sidebar transitions */
+.sidebar { transition: width 240ms cubic-bezier(0.4, 0, 0.2, 1); }
+.sidebar-label { transition: opacity 150ms ease; }
+.sidebar-collapsed .sidebar-label,
+.sidebar-collapsed .sidebar-section-title,
+.sidebar-collapsed .sidebar-profile {
+  opacity: 0;
+  pointer-events: none;
+}
+.sidebar-collapsed .sidebar-profile-card {
+  display: none;
+}
