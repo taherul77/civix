@@ -2,26 +2,35 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileCheck, Download } from "lucide-react";
+import { ArrowLeft, FileCheck, Download, Send, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
+import { api } from "@/server/api";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
 import { fmtAny } from "@/lib/utils";
+import { useCan } from "@/lib/auth-context";
 
 export function TestDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const test = useData((s) => s.tests.find((t) => t.id === id));
-  const samples = useData((s) => s.samples);
-  const projects = useData((s) => s.projects);
+  const { data: test } = useTestQuery(id);
+  const { data: sample } = useSampleQuery(test?.sampleId);
+  const { data: project } = useProjectQuery(test?.projectId);
+  const { data: audit = [] } = useAuditQuery();
+
+  const canSubmit = useCan("test:submit");
 
   if (!test) notFound();
-  const sample = samples.find((s) => s.id === test.sampleId);
-  const project = projects.find((p) => p.id === test.projectId);
+  const testAudit = audit.filter((a) => a.entity === "test" && a.entityId === test.id);
+  const lastByAction = (action: string) => testAudit.find((a) => a.action === action);
+  const submitEvt   = lastByAction("submit");
+  const reviewEvt   = lastByAction("review");
+  const approveEvt  = lastByAction("approve");
+  const signEvt     = lastByAction("sign");
 
   return (
     <div className="space-y-6">
@@ -36,6 +45,24 @@ export function TestDetailView({ id }: { id: string }) {
           <div className="flex items-center gap-2">
             <StatusBadge value={test.status} />
             <StatusBadge value={test.passFail} />
+            {test.status === "draft" && (
+              <button
+                onClick={() => api.tests.submit(test.id)}
+                disabled={!canSubmit}
+                className="btn btn-outline"
+                title={canSubmit ? "" : tt("Requires Lab Engineer / Technician role")}
+              >
+                <Send className="w-4 h-4" /> {tt("Submit for review")}
+              </button>
+            )}
+            {(test.status === "submitted" || test.status === "reviewed") && (
+              <button
+                onClick={() => api.tests.reject(test.id)}
+                className="btn btn-outline"
+              >
+                <RotateCcw className="w-4 h-4" /> {tt("Return to draft")}
+              </button>
+            )}
             <Link href={`/tests/${test.id}/report`} className="btn btn-primary">
               <FileCheck className="w-4 h-4" /> {tt("View report")}
             </Link>
@@ -86,10 +113,36 @@ export function TestDetailView({ id }: { id: string }) {
 
         <div className="card p-5 space-y-3">
           <h3 className="font-semibold">{tt("Workflow")}</h3>
-          <Step done label={tt("Created")}              by={loc(test.technician)} at={fmtAny(test.testDate, lang)} />
-          <Step done label={tt("Submitted for review")} by={loc(test.technician)} at={fmtAny(test.testDate, lang)} />
-          <Step done={test.status !== "submitted"} label={tt("Reviewed")} by={tt("Quality Manager")} at={fmtAny(test.testDate, lang)} />
-          <Step done={test.status === "approved"}  label={tt("Approved")} by={tt("Lab Director")}    at={fmtAny(test.testDate, lang)} />
+          <Step
+            done
+            label={tt("Created")}
+            by={loc(test.technician)}
+            at={fmtAny(test.testDate, lang)}
+          />
+          <Step
+            done={!!submitEvt || ["submitted","reviewed","approved"].includes(test.status)}
+            label={tt("Submitted for review")}
+            by={submitEvt?.user ?? loc(test.technician)}
+            at={submitEvt?.ts ?? "—"}
+          />
+          <Step
+            done={!!reviewEvt || ["reviewed","approved"].includes(test.status)}
+            label={tt("Reviewed")}
+            by={reviewEvt?.user ?? tt("Quality Manager")}
+            at={reviewEvt?.ts ?? "—"}
+          />
+          <Step
+            done={!!approveEvt || test.status === "approved"}
+            label={tt("Approved")}
+            by={approveEvt?.user ?? tt("Approver")}
+            at={approveEvt?.ts ?? "—"}
+          />
+          <Step
+            done={!!signEvt}
+            label={tt("Digitally signed")}
+            by={signEvt?.user ?? "—"}
+            at={signEvt?.ts ?? "—"}
+          />
           <div className="pt-3 border-t border-[rgb(var(--border))]">
             <button className="btn btn-outline w-full"><Download className="w-4 h-4" /> {tt("Download PDF")}</button>
           </div>

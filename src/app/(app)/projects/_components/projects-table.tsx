@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useProjectsQuery, useSamplesQuery, useTestsQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
@@ -12,9 +12,9 @@ export function ProjectsTable() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const projects = useData((s) => s.projects);
-  const samples = useData((s) => s.samples);
-  const tests = useData((s) => s.tests);
+  const { data: projects = [] } = useProjectsQuery();
+  const { data: samples = [] } = useSamplesQuery();
+  const { data: tests = [] } = useTestsQuery();
 
   return (
     <div className="card overflow-hidden">

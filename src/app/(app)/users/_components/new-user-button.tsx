@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useData, type User } from "@/store/data-store";
 import { Modal, Field } from "@/components/ui/modal";
+import { useActor, useCan } from "@/lib/auth-context";
 
 const ROLES = [
   "Lab Engineer", "Project Manager", "Lab Technician", "Field Technician",
@@ -15,7 +16,10 @@ const DEPTS = ["Concrete", "Soil", "Aggregate", "Asphalt", "Steel", "Cement", "Q
 export function NewUserButton() {
   const tt = useT();
   const addUser = useData((s) => s.addUser);
+  const actor = useActor();
+  const canInvite = useCan("user:invite");
   const [open, setOpen] = useState(false);
+  if (!canInvite) return null;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,7 +31,7 @@ export function NewUserButton() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    addUser({ name: name.trim(), email: email.trim(), role, dept, status, mfa });
+    addUser({ name: name.trim(), email: email.trim(), role, dept, status, mfa }, actor ?? undefined);
     setName(""); setEmail(""); setRole(ROLES[0]); setDept(DEPTS[0]);
     setStatus("active"); setMfa(true);
     setOpen(false);

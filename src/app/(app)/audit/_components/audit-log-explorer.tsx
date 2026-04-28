@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search, Shield } from "lucide-react";
-import { audit } from "@/lib/mock-extra";
+import { audit as seedAudit } from "@/lib/mock-extra";
+import { useAuditQuery } from "@/server/queries";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
@@ -19,10 +20,27 @@ const actionTone: Record<string, string> = {
 
 export function AuditLogExplorer() {
   const tt = useT();
+  const { data: liveAudit = [] } = useAuditQuery();
+  const merged = useMemo(
+    () => [
+      ...liveAudit.map((a) => ({
+        id: a.id,
+        ts: a.ts,
+        user: a.user,
+        action: a.action,
+        entity: a.entity.charAt(0).toUpperCase() + a.entity.slice(1),
+        entityId: a.entityId,
+        diff: a.diff,
+        ip: a.ip,
+      })),
+      ...seedAudit,
+    ],
+    [liveAudit]
+  );
   const [q, setQ] = useState("");
   const filtered = useMemo(
-    () => audit.filter((a) => !q || `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q.toLowerCase())),
-    [q]
+    () => merged.filter((a) => !q || `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q.toLowerCase())),
+    [merged, q]
   );
 
   return (

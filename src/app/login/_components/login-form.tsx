@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FlaskConical, Lock, Mail, Building2 } from "lucide-react";
+import { FlaskConical, Lock, Mail, Building2, ShieldCheck } from "lucide-react";
 import { useApp } from "@/store/app-store";
+import { useData } from "@/store/data-store";
+import { ALL_ROLES } from "@/lib/rbac";
 
 const tenants = [
   { id: "aramco-lab", name: "Saudi Aramco Materials Lab" },
@@ -15,9 +17,11 @@ const tenants = [
 export function LoginForm() {
   const router = useRouter();
   const signIn = useApp((s) => s.signIn);
+  const log = useData((s) => s.log);
   const [email, setEmail] = useState("eng.fahad@aramco-lab.sa");
   const [password, setPassword] = useState("demo");
   const [tenant, setTenant] = useState(tenants[0].id);
+  const [role, setRole] = useState<string>("Lab Engineer");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = (e: React.FormEvent) => {
@@ -30,7 +34,14 @@ export function LoginForm() {
         .split(".")
         .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
         .join(" ");
-      signIn({ email, name, role: "Lab Engineer", tenant: tenantName });
+      signIn({ email, name, role, tenant: tenantName });
+      log({
+        user: `${name} (${role})`,
+        email,
+        action: "login",
+        entity: "session",
+        entityId: email,
+      });
       router.replace("/dashboard");
     }, 400);
   };
@@ -76,6 +87,20 @@ export function LoginForm() {
           <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]" />
           <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input pl-9" />
         </div>
+      </div>
+
+      <div>
+        <label className="label">Role</label>
+        <div className="relative">
+          <ShieldCheck className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]" />
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="input pl-9">
+            {ALL_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <p className="help mt-1">
+          Demo only — pick the role you want to test (e.g. <em>Approver</em> to sign reports,
+          <em> Quality Manager</em> to review, <em>Lab Technician</em> to enter data).
+        </p>
       </div>
 
       <button type="submit" disabled={loading} className="btn btn-primary w-full">

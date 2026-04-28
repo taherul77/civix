@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useData, type Invoice } from "@/store/data-store";
 import { Modal, Field } from "@/components/ui/modal";
+import { useActor, useCan } from "@/lib/auth-context";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const autoId = () => `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
@@ -12,7 +13,10 @@ const autoId = () => `INV-${new Date().getFullYear()}-${String(Math.floor(Math.r
 export function NewInvoiceButton() {
   const tt = useT();
   const addInvoice = useData((s) => s.addInvoice);
+  const actor = useActor();
+  const canCreate = useCan("billing:create");
   const [open, setOpen] = useState(false);
+  if (!canCreate) return null;
 
   const [id, setId] = useState(autoId());
   const [client, setClient] = useState("");
@@ -32,7 +36,7 @@ export function NewInvoiceButton() {
       status,
       date,
       zatca: status === "draft" ? "—" : `ZX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-    });
+    }, actor ?? undefined);
     setId(autoId()); setClient(""); setAmount(""); setStatus("draft");
     setOpen(false);
   };

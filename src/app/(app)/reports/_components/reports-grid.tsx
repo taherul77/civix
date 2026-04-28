@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FileText, Download } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useTestsQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
@@ -13,7 +13,7 @@ export function ReportsGrid() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const tests = useData((s) => s.tests);
+  const { data: tests = [] } = useTestsQuery();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

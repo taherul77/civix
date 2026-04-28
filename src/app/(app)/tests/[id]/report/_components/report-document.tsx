@@ -3,7 +3,7 @@
 import { notFound } from "next/navigation";
 import { ShieldCheck, FileCheck } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useTestQuery, useSampleQuery, useProjectQuery } from "@/server/queries";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
@@ -13,13 +13,11 @@ export function ReportDocument({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const test = useData((s) => s.tests.find((t) => t.id === id));
-  const samples = useData((s) => s.samples);
-  const projects = useData((s) => s.projects);
+  const { data: test } = useTestQuery(id);
+  const { data: sample } = useSampleQuery(test?.sampleId);
+  const { data: project } = useProjectQuery(test?.projectId);
 
   if (!test) notFound();
-  const sample = samples.find((s) => s.id === test.sampleId);
-  const project = projects.find((p) => p.id === test.projectId);
   const reportNum = `RPT-2026-${test.code.split("-").pop()}`;
 
   return (

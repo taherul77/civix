@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, MapPin, Calendar, User } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useProjectQuery, useSamplesQuery, useTestsQuery } from "@/server/queries";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
@@ -15,14 +15,11 @@ export function ProjectDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const project = useData((s) => s.projects.find((p) => p.id === id));
-  const samples = useData((s) => s.samples);
-  const tests = useData((s) => s.tests);
+  const { data: project } = useProjectQuery(id);
+  const { data: projectSamples = [] } = useSamplesQuery({ projectId: id });
+  const { data: projectTests   = [] } = useTestsQuery({ projectId: id });
 
   if (!project) notFound();
-
-  const projectSamples = samples.filter((s) => s.projectId === project.id);
-  const projectTests = tests.filter((t) => t.projectId === project.id);
 
   return (
     <div className="space-y-6">

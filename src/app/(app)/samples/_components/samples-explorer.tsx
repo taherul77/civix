@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Filter } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useSamplesQuery, useProjectsQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
@@ -15,22 +15,12 @@ export function SamplesExplorer() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const samples = useData((s) => s.samples);
-  const projects = useData((s) => s.projects);
 
   const [type, setType] = useState<(typeof TYPES)[number]>("all");
   const [q, setQ] = useState("");
 
-  const filtered = useMemo(() => {
-    return samples.filter((s) => {
-      if (type !== "all" && s.type !== type) return false;
-      const locStr = typeof s.location === "string"
-        ? s.location
-        : (s.location?.en ?? "") + " " + (s.location?.ar ?? "");
-      if (q && !`${s.code} ${locStr}`.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [samples, type, q]);
+  const { data: filtered = [] } = useSamplesQuery({ type, q });
+  const { data: projects = [] } = useProjectsQuery();
 
   return (
     <>

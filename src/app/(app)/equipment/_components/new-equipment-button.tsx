@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useData } from "@/store/data-store";
 import { Modal, Field } from "@/components/ui/modal";
+import { useActor, useCan } from "@/lib/auth-context";
 import type { Equipment } from "@/lib/mock-data";
 
 const autoCode = () => `EQ-NEW-${String(Math.floor(Math.random() * 90) + 10)}`;
@@ -13,7 +14,10 @@ const addDays = (d: number) => new Date(Date.now() + d * 86400000).toISOString()
 export function NewEquipmentButton() {
   const tt = useT();
   const addEquipment = useData((s) => s.addEquipment);
+  const actor = useActor();
+  const canCreate = useCan("equipment:create");
   const [open, setOpen] = useState(false);
+  if (!canCreate) return null;
 
   const [code, setCode] = useState(autoCode());
   const [name, setName] = useState("");
@@ -34,7 +38,7 @@ export function NewEquipmentButton() {
       serial: serial.trim(),
       calibrationDue,
       status,
-    });
+    }, actor ?? undefined);
     setCode(autoCode());
     setName(""); setManufacturer(""); setModel(""); setSerial("");
     setCalibrationDue(addDays(180)); setStatus("active");

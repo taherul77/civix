@@ -1,7 +1,7 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useEquipmentQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
@@ -15,7 +15,7 @@ export function EquipmentTable() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const equipment = useData((s) => s.equipment);
+  const { data: equipment = [] } = useEquipmentQuery();
 
   return (
     <div className="card overflow-hidden">

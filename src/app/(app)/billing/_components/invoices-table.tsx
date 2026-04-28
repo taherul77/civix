@@ -1,12 +1,12 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useData } from "@/store/data-store";
+import { useInvoicesQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 
 export function InvoicesTable() {
   const tt = useT();
-  const invoices = useData((s) => s.invoices);
+  const { data: invoices = [] } = useInvoicesQuery();
 
   return (
     <div className="card overflow-hidden">

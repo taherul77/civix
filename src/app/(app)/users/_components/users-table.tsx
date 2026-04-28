@@ -1,12 +1,12 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useUsersQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 
 export function UsersTable() {
   const tt = useT();
-  const users = useData((s) => s.users);
+  const { data: users = [] } = useUsersQuery();
 
   return (
     <div className="card overflow-hidden">

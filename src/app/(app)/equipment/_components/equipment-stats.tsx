@@ -1,7 +1,7 @@
 "use client";
 
 import { Wrench, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useData } from "@/store/data-store";
+import { useEquipmentQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 
 function daysUntil(date: string) {
@@ -10,7 +10,7 @@ function daysUntil(date: string) {
 
 export function EquipmentStats() {
   const tt = useT();
-  const equipment = useData((s) => s.equipment);
+  const { data: equipment = [] } = useEquipmentQuery();
   const overdueOrSoon = equipment.filter((e) => daysUntil(e.calibrationDue) < 30).length;
   const active = equipment.filter((e) => e.status === "active").length;
 

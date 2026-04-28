@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Filter, FileCheck } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useData } from "@/store/data-store";
+import { useTestsQuery, useSamplesQuery, useProjectsQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
@@ -17,23 +17,15 @@ export function TestsExplorer() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const tests = useData((s) => s.tests);
-  const samples = useData((s) => s.samples);
-  const projects = useData((s) => s.projects);
 
   const [status, setStatus] = useState<(typeof STATUS)[number]>("all");
   const [cat, setCat] = useState<(typeof CATS)[number]>("all");
   const [q, setQ] = useState("");
 
-  const filtered = useMemo(() => {
-    return tests.filter((t) => {
-      if (status !== "all" && t.status !== status) return false;
-      if (cat !== "all" && t.category !== cat) return false;
-      const nameStr = typeof t.name === "string" ? t.name : (t.name?.en ?? "") + " " + (t.name?.ar ?? "");
-      if (q && !`${t.code} ${nameStr} ${t.standard}`.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [tests, status, cat, q]);
+  const { data: filtered = [] } = useTestsQuery({ status, category: cat, q });
+  const { data: total = 0 } = useTestsQuery({});
+  const { data: samples = [] } = useSamplesQuery();
+  const { data: projects = [] } = useProjectsQuery();
 
   return (
     <>
@@ -60,7 +52,7 @@ export function TestsExplorer() {
           className="input flex-1 min-w-[240px]"
         />
         <div className="text-xs text-[rgb(var(--muted))] px-2">
-          {filtered.length} {tt("of")} {tests.length}
+          {filtered.length} {tt("of")} {total}
         </div>
       </div>
 

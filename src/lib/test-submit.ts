@@ -1,6 +1,7 @@
 "use client";
 
 import { useData } from "@/store/data-store";
+import { getActor } from "@/lib/auth-context";
 import type { Test } from "@/lib/mock-data";
 import type { TestContext } from "@/components/test-form/context-bar";
 
@@ -35,7 +36,9 @@ export function submitTest(args: SubmitArgs): string {
     || "";
 
   const newCode = nextTestCode();
-  useData.getState().addTest({
+  const actor = getActor() ?? undefined;
+  // Always create as draft so the audit log records create→submit as two steps.
+  const id = useData.getState().addTest({
     code: newCode,
     name: args.name,
     category: args.category,
@@ -43,10 +46,14 @@ export function submitTest(args: SubmitArgs): string {
     sampleId,
     projectId,
     testDate: args.ctx.testDate,
-    technician: args.ctx.technician || "—",
-    status: args.status,
+    technician: args.ctx.technician || actor?.name || "—",
+    status: "draft",
     passFail: args.passFail,
     primaryResult: args.primaryResult,
-  });
+  }, actor);
+
+  if (args.status === "submitted" && actor) {
+    useData.getState().submitTestForReview({ testId: id, actor });
+  }
   return newCode;
 }

@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useData } from "@/store/data-store";
 import { Modal, Field } from "@/components/ui/modal";
+import { useActor, useCan } from "@/lib/auth-context";
 import type { Sample } from "@/lib/mock-data";
 
 const TYPES = ["concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
@@ -24,7 +25,10 @@ export function NewSampleButton() {
   const loc = useLoc();
   const projects = useData((s) => s.projects);
   const addSample = useData((s) => s.addSample);
+  const actor = useActor();
+  const canCreate = useCan("sample:create");
   const [open, setOpen] = useState(false);
+  if (!canCreate) return null;
 
   const [code, setCode] = useState(autoSampleCode());
   const [type, setType] = useState<Sample["type"]>("concrete");
@@ -44,9 +48,9 @@ export function NewSampleButton() {
       projectId: useProject,
       date,
       location: location.trim(),
-      sampledBy: sampledBy.trim(),
+      sampledBy: sampledBy.trim() || actor?.name || "—",
       status,
-    });
+    }, actor ?? undefined);
     setCode(autoSampleCode());
     setLocation(""); setSampledBy(""); setStatus("pending");
     setOpen(false);
