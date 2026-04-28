@@ -7,6 +7,10 @@ import { ArrowLeft, FileCheck, Download } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { testById, sampleById, projectById } from "@/lib/mock-data";
+import { useLoc } from "@/lib/i18n-data";
+import { useT } from "@/lib/i18n";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 export default function TestDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -14,22 +18,25 @@ export default function TestDetail({ params }: { params: Promise<{ id: string }>
   if (!test) notFound();
   const sample = sampleById(test.sampleId);
   const project = projectById(test.projectId);
+  const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   return (
     <div className="space-y-6">
       <Link href="/tests" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
-        <ArrowLeft className="w-4 h-4" /> Back to tests
+        <ArrowLeft className="w-4 h-4" /> {tt("Back to tests")}
       </Link>
 
       <PageHeader
-        title={test.name}
-        description={`${test.code} • ${test.standard}`}
+        title={loc(test.name)}
+        description={`${fmtAny(test.code, lang)} • ${test.standard}`}
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge value={test.status} />
             <StatusBadge value={test.passFail} />
             <Link href={`/tests/${test.id}/report`} className="btn btn-primary">
-              <FileCheck className="w-4 h-4" /> View report
+              <FileCheck className="w-4 h-4" /> {tt("View report")}
             </Link>
           </div>
         }
@@ -38,52 +45,52 @@ export default function TestDetail({ params }: { params: Promise<{ id: string }>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2 space-y-4">
           <div>
-            <h3 className="font-semibold mb-3">Test summary</h3>
+            <h3 className="font-semibold mb-3">{tt("Test summary")}</h3>
             <dl className="grid grid-cols-2 gap-y-3 text-sm">
-              <dt className="text-[rgb(var(--muted))]">Standard</dt><dd>{test.standard}</dd>
-              <dt className="text-[rgb(var(--muted))]">Test date</dt><dd>{test.testDate}</dd>
-              <dt className="text-[rgb(var(--muted))]">Technician</dt><dd>{test.technician}</dd>
-              <dt className="text-[rgb(var(--muted))]">Category</dt><dd className="capitalize">{test.category}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Standard")}</dt><dd>{test.standard}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Test date")}</dt><dd>{fmtAny(test.testDate, lang)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Technician")}</dt><dd>{loc(test.technician)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Category")}</dt><dd className="capitalize">{tt(test.category.charAt(0).toUpperCase() + test.category.slice(1))}</dd>
               {test.primaryResult && (
                 <>
-                  <dt className="text-[rgb(var(--muted))]">{test.primaryResult.label}</dt>
-                  <dd className="font-semibold text-lg">{test.primaryResult.value} {test.primaryResult.unit}</dd>
+                  <dt className="text-[rgb(var(--muted))]">{loc(test.primaryResult.label)}</dt>
+                  <dd className="font-semibold text-lg">{fmtAny(test.primaryResult.value, lang)} {test.primaryResult.unit}</dd>
                 </>
               )}
             </dl>
           </div>
 
           <div className="border-t border-[rgb(var(--border))] pt-4">
-            <h3 className="font-semibold mb-3">Sample</h3>
+            <h3 className="font-semibold mb-3">{tt("Sample")}</h3>
             <dl className="grid grid-cols-2 gap-y-3 text-sm">
-              <dt className="text-[rgb(var(--muted))]">Code</dt><dd className="font-mono text-xs">{sample?.code}</dd>
-              <dt className="text-[rgb(var(--muted))]">Type</dt><dd className="capitalize">{sample?.type}</dd>
-              <dt className="text-[rgb(var(--muted))]">Location</dt><dd>{sample?.location}</dd>
-              <dt className="text-[rgb(var(--muted))]">Sampled by</dt><dd>{sample?.sampledBy}</dd>
-              <dt className="text-[rgb(var(--muted))]">Sample date</dt><dd>{sample?.date}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Code")}</dt><dd className="font-mono text-xs">{fmtAny(sample?.code ?? "", lang)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Type")}</dt><dd className="capitalize">{sample ? tt(sample.type.charAt(0).toUpperCase() + sample.type.slice(1)) : "—"}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Location")}</dt><dd>{loc(sample?.location)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Sampled by")}</dt><dd>{loc(sample?.sampledBy)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Sample date")}</dt><dd>{fmtAny(sample?.date ?? "", lang)}</dd>
             </dl>
           </div>
 
           <div className="border-t border-[rgb(var(--border))] pt-4">
-            <h3 className="font-semibold mb-3">Project</h3>
+            <h3 className="font-semibold mb-3">{tt("Project")}</h3>
             <dl className="grid grid-cols-2 gap-y-3 text-sm">
-              <dt className="text-[rgb(var(--muted))]">Code</dt><dd className="font-mono text-xs">{project?.code}</dd>
-              <dt className="text-[rgb(var(--muted))]">Name</dt>
-              <dd><Link href={`/projects/${project?.id}`} className="hover:text-brand-600 hover:underline">{project?.name}</Link></dd>
-              <dt className="text-[rgb(var(--muted))]">Client</dt><dd>{project?.client}</dd>
-              <dt className="text-[rgb(var(--muted))]">Engineer</dt><dd>{project?.engineer}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Code")}</dt><dd className="font-mono text-xs">{fmtAny(project?.code ?? "", lang)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Name")}</dt>
+              <dd><Link href={`/projects/${project?.id}`} className="hover:text-brand-600 hover:underline">{loc(project?.name)}</Link></dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Client")}</dt><dd>{loc(project?.client)}</dd>
+              <dt className="text-[rgb(var(--muted))]">{tt("Engineer")}</dt><dd>{loc(project?.engineer)}</dd>
             </dl>
           </div>
         </div>
 
         <div className="card p-5 space-y-3">
-          <h3 className="font-semibold">Workflow</h3>
-          <Step done label="Created" by={test.technician} at={test.testDate} />
-          <Step done label="Submitted for review" by={test.technician} at={test.testDate} />
-          <Step done={test.status !== "submitted"} label="Reviewed" by="Quality Manager" at={test.testDate} />
-          <Step done={test.status === "approved"} label="Approved" by="Lab Director" at={test.testDate} />
+          <h3 className="font-semibold">{tt("Workflow")}</h3>
+          <Step done label={tt("Created")}              by={loc(test.technician)} at={fmtAny(test.testDate, lang)} />
+          <Step done label={tt("Submitted for review")} by={loc(test.technician)} at={fmtAny(test.testDate, lang)} />
+          <Step done={test.status !== "submitted"} label={tt("Reviewed")} by={tt("Quality Manager")} at={fmtAny(test.testDate, lang)} />
+          <Step done={test.status === "approved"}  label={tt("Approved")} by={tt("Lab Director")}    at={fmtAny(test.testDate, lang)} />
           <div className="pt-3 border-t border-[rgb(var(--border))]">
-            <button className="btn btn-outline w-full"><Download className="w-4 h-4" /> Download PDF</button>
+            <button className="btn btn-outline w-full"><Download className="w-4 h-4" /> {tt("Download PDF")}</button>
           </div>
         </div>
       </div>

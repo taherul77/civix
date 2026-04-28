@@ -6,6 +6,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Download, Printer, ShieldCheck, FileCheck } from "lucide-react";
 import { testById, sampleById, projectById } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useLoc } from "@/lib/i18n-data";
+import { useT } from "@/lib/i18n";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -13,6 +17,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   if (!test) notFound();
   const sample = sampleById(test.sampleId);
   const project = projectById(test.projectId);
+  const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   const reportNum = `RPT-2026-${test.code.split("-").pop()}`;
 
@@ -53,9 +60,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
         {/* Title */}
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-slate-900">{test.name}</h1>
+          <h1 className="text-xl font-bold text-slate-900">{loc(test.name)}</h1>
           <div className="text-sm text-slate-600 mt-1">
-            Standard: <span className="font-medium">{test.standard}</span>
+            {tt("Standard")}: <span className="font-medium">{test.standard}</span>
           </div>
         </div>
 
@@ -63,29 +70,29 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         <section className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <h2 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 border-b border-slate-200 pb-1">
-              Project information
+              {tt("Project information")}
             </h2>
             <table className="w-full text-sm">
               <tbody>
-                <Row label="Project name">{project?.name}</Row>
-                <Row label="Project code"><span className="font-mono text-xs">{project?.code}</span></Row>
-                <Row label="Client">{project?.client}</Row>
-                <Row label="Location">{project?.city}</Row>
-                <Row label="Engineer">{project?.engineer}</Row>
+                <Row label={tt("Project name")}>{loc(project?.name)}</Row>
+                <Row label={tt("Project code")}><span className="font-mono text-xs">{fmtAny(project?.code ?? "", lang)}</span></Row>
+                <Row label={tt("Client")}>{loc(project?.client)}</Row>
+                <Row label={tt("Location")}>{loc(project?.city)}</Row>
+                <Row label={tt("Engineer")}>{loc(project?.engineer)}</Row>
               </tbody>
             </table>
           </div>
           <div>
             <h2 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 border-b border-slate-200 pb-1">
-              Sample information
+              {tt("Sample information")}
             </h2>
             <table className="w-full text-sm">
               <tbody>
-                <Row label="Sample code"><span className="font-mono text-xs">{sample?.code}</span></Row>
-                <Row label="Type"><span className="capitalize">{sample?.type}</span></Row>
-                <Row label="Location">{sample?.location}</Row>
-                <Row label="Sampled by">{sample?.sampledBy}</Row>
-                <Row label="Sample date">{sample?.date}</Row>
+                <Row label={tt("Sample code")}><span className="font-mono text-xs">{fmtAny(sample?.code ?? "", lang)}</span></Row>
+                <Row label={tt("Type")}><span className="capitalize">{sample ? tt(sample.type.charAt(0).toUpperCase() + sample.type.slice(1)) : "—"}</span></Row>
+                <Row label={tt("Location")}>{loc(sample?.location)}</Row>
+                <Row label={tt("Sampled by")}>{loc(sample?.sampledBy)}</Row>
+                <Row label={tt("Sample date")}>{fmtAny(sample?.date ?? "", lang)}</Row>
               </tbody>
             </table>
           </div>
@@ -94,16 +101,16 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         {/* Test method */}
         <section className="mb-6">
           <h2 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 border-b border-slate-200 pb-1">
-            Test method
+            {tt("Test method")}
           </h2>
           <table className="w-full text-sm">
             <tbody>
-              <Row label="Test code"><span className="font-mono text-xs">{test.code}</span></Row>
-              <Row label="Standard">{test.standard}</Row>
-              <Row label="Test date">{test.testDate}</Row>
-              <Row label="Technician">{test.technician}</Row>
-              <Row label="Equipment">Forney VFD F-505 • S/N FV-9921 (cal. due 2026-09-12)</Row>
-              <Row label="Conditions">23 °C / 96% RH / 1013 hPa</Row>
+              <Row label={tt("Test code")}><span className="font-mono text-xs">{fmtAny(test.code, lang)}</span></Row>
+              <Row label={tt("Standard")}>{test.standard}</Row>
+              <Row label={tt("Test date")}>{fmtAny(test.testDate, lang)}</Row>
+              <Row label={tt("Technician")}>{loc(test.technician)}</Row>
+              <Row label={tt("Equipment")}>Forney VFD F-505 • S/N FV-9921 (cal. due 2026-09-12)</Row>
+              <Row label={tt("Conditions")}>23 °C / 96% RH / 1013 hPa</Row>
             </tbody>
           </table>
         </section>
@@ -111,19 +118,19 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         {/* Results */}
         <section className="mb-6">
           <h2 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 border-b border-slate-200 pb-1">
-            Results
+            {tt("Results")}
           </h2>
           {test.primaryResult ? (
             <div className="rounded-lg border-2 border-brand-700 p-5 bg-brand-50">
               <div className="text-[10px] uppercase tracking-wider text-brand-700 font-bold">
-                {test.primaryResult.label}
+                {loc(test.primaryResult.label)}
               </div>
               <div className="text-4xl font-bold text-brand-900 mt-1">
-                {test.primaryResult.value} <span className="text-xl text-brand-700">{test.primaryResult.unit}</span>
+                {fmtAny(test.primaryResult.value, lang)} <span className="text-xl text-brand-700">{test.primaryResult.unit}</span>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-slate-500 italic">Results pending — test in progress.</div>
+            <div className="text-sm text-slate-500 italic">{tt("Results pending — test in progress.")}</div>
           )}
         </section>
 
@@ -171,10 +178,10 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           {["Tested by", "Reviewed by", "Approved by"].map((role, i) => (
             <div key={role} className="text-center">
               <div className="h-14 border-b border-slate-300 mb-2 italic text-slate-600 flex items-end justify-center pb-1 text-xs">
-                {i === 0 ? test.technician : i === 1 ? "Eng. M. Hamzah" : "Dr. A. Al-Rashid"}
+                {i === 0 ? loc(test.technician) : i === 1 ? tt("Eng. M. Hamzah") : tt("Dr. A. Al-Rashid")}
               </div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{role}</div>
-              <div className="text-xs mt-1 text-slate-600">{test.testDate}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{tt(role)}</div>
+              <div className="text-xs mt-1 text-slate-600">{fmtAny(test.testDate, lang)}</div>
             </div>
           ))}
         </section>

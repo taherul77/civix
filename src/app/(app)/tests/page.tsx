@@ -7,6 +7,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests, sampleById, projectById } from "@/lib/mock-data";
 import { useT } from "@/lib/i18n";
+import { useLoc } from "@/lib/i18n-data";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 const STATUS = ["all", "draft", "submitted", "reviewed", "approved"] as const;
 const CATS = ["all", "concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
@@ -16,6 +19,8 @@ export default function TestsPage() {
   const [cat, setCat] = useState<(typeof CATS)[number]>("all");
   const [q, setQ] = useState("");
   const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   const filtered = useMemo(() => {
     return tests.filter((t) => {
@@ -79,21 +84,21 @@ export default function TestsPage() {
                 const project = projectById(t.projectId);
                 return (
                   <tr key={t.id}>
-                    <td className="font-mono text-xs">{t.code}</td>
+                    <td className="font-mono text-xs">{fmtAny(t.code, lang)}</td>
                     <td>
                       <Link href={`/tests/${t.id}`} className="font-medium hover:text-brand-600 hover:underline">
-                        {t.name}
+                        {loc(t.name)}
                       </Link>
-                      <div className="text-xs text-[rgb(var(--muted))] capitalize">{t.category}</div>
+                      <div className="text-xs text-[rgb(var(--muted))] capitalize">{tt(t.category.charAt(0).toUpperCase() + t.category.slice(1))}</div>
                     </td>
                     <td className="text-sm">
-                      <div>{project?.code}</div>
-                      <div className="text-xs text-[rgb(var(--muted))]">{sample?.code}</div>
+                      <div>{fmtAny(project?.code ?? "", lang)}</div>
+                      <div className="text-xs text-[rgb(var(--muted))]">{fmtAny(sample?.code ?? "", lang)}</div>
                     </td>
                     <td className="text-xs text-[rgb(var(--muted))]">{t.standard}</td>
-                    <td>{t.testDate}</td>
+                    <td>{fmtAny(t.testDate, lang)}</td>
                     <td className="font-medium">
-                      {t.primaryResult ? `${t.primaryResult.value} ${t.primaryResult.unit}` : "—"}
+                      {t.primaryResult ? `${fmtAny(t.primaryResult.value, lang)} ${t.primaryResult.unit}` : "—"}
                     </td>
                     <td><StatusBadge value={t.status} /></td>
                     <td><StatusBadge value={t.passFail} /></td>

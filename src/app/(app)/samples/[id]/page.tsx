@@ -7,6 +7,10 @@ import { ArrowLeft, MapPin, Calendar, User, Beaker, FileSignature } from "lucide
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { sampleById, projectById, tests } from "@/lib/mock-data";
+import { useLoc } from "@/lib/i18n-data";
+import { useT } from "@/lib/i18n";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 interface CocStep { ts: string; user: string; action: string; notes?: string; signature?: boolean }
 
@@ -26,24 +30,27 @@ export default function SampleDetail({ params }: { params: Promise<{ id: string 
   if (!sample) notFound();
   const project = projectById(sample.projectId);
   const sampleTests = tests.filter((t) => t.sampleId === sample.id);
+  const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   return (
     <div className="space-y-6">
       <Link href="/samples" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
-        <ArrowLeft className="w-4 h-4" /> Back to samples
+        <ArrowLeft className="w-4 h-4" /> {tt("Back to samples")}
       </Link>
 
       <PageHeader
-        title={`Sample ${sample.code}`}
-        description={`${sample.type.toUpperCase()} · ${project?.name}`}
+        title={`${tt("Sample")} ${fmtAny(sample.code, lang)}`}
+        description={`${tt(sample.type.charAt(0).toUpperCase() + sample.type.slice(1))} · ${project ? loc(project.name) : ""}`}
         actions={<StatusBadge value={sample.status} />}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Info icon={Beaker} label="Type" value={sample.type} />
-        <Info icon={MapPin} label="Location" value={sample.location} />
-        <Info icon={User} label="Sampled by" value={sample.sampledBy} />
-        <Info icon={Calendar} label="Sample date" value={sample.date} />
+        <Info icon={Beaker}   label={tt("Type")}        value={tt(sample.type.charAt(0).toUpperCase() + sample.type.slice(1))} />
+        <Info icon={MapPin}   label={tt("Location")}    value={loc(sample.location)} />
+        <Info icon={User}     label={tt("Sampled by")}  value={loc(sample.sampledBy)} />
+        <Info icon={Calendar} label={tt("Date")}        value={fmtAny(sample.date, lang)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -78,10 +85,10 @@ export default function SampleDetail({ params }: { params: Promise<{ id: string 
               {sampleTests.map((t) => (
                 <li key={t.id} className="border border-[rgb(var(--border))] rounded-lg p-3 hover:bg-[rgb(var(--border))]/30">
                   <Link href={`/tests/${t.id}`} className="block">
-                    <div className="text-xs font-mono text-[rgb(var(--muted))]">{t.code}</div>
-                    <div className="font-medium leading-tight">{t.name}</div>
+                    <div className="text-xs font-mono text-[rgb(var(--muted))]">{fmtAny(t.code, lang)}</div>
+                    <div className="font-medium leading-tight">{loc(t.name)}</div>
                     <div className="flex items-center justify-between mt-2">
-                      <div className="text-xs">{t.primaryResult ? `${t.primaryResult.value} ${t.primaryResult.unit}` : "—"}</div>
+                      <div className="text-xs">{t.primaryResult ? `${fmtAny(t.primaryResult.value, lang)} ${t.primaryResult.unit}` : "—"}</div>
                       <StatusBadge value={t.passFail} />
                     </div>
                   </Link>

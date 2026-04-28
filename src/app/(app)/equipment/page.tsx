@@ -5,6 +5,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { equipment } from "@/lib/mock-data";
 import { useT } from "@/lib/i18n";
+import { useLoc } from "@/lib/i18n-data";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 function daysUntil(date: string) {
   const d = (new Date(date).getTime() - Date.now()) / 86400000;
@@ -13,6 +16,8 @@ function daysUntil(date: string) {
 
 export default function EquipmentPage() {
   const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
   const overdueOrSoon = equipment.filter((e) => daysUntil(e.calibrationDue) < 30).length;
   const active = equipment.filter((e) => e.status === "active").length;
 
@@ -54,15 +59,17 @@ export default function EquipmentPage() {
                 const tone = days < 0 ? "text-rose-600 font-medium" : days < 30 ? "text-amber-600 font-medium" : "";
                 return (
                   <tr key={e.id}>
-                    <td className="font-mono text-xs">{e.code}</td>
-                    <td className="font-medium">{e.name}</td>
+                    <td className="font-mono text-xs">{fmtAny(e.code, lang)}</td>
+                    <td className="font-medium">{loc(e.name)}</td>
                     <td>{e.manufacturer}</td>
                     <td>{e.model}</td>
-                    <td className="font-mono text-xs">{e.serial}</td>
+                    <td className="font-mono text-xs">{fmtAny(e.serial, lang)}</td>
                     <td className={tone}>
-                      {e.calibrationDue}
+                      {fmtAny(e.calibrationDue, lang)}
                       <div className="text-xs">
-                        {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d remaining`}
+                        {days < 0
+                          ? `${fmtAny(Math.abs(days), lang)} ${tt("d overdue")}`
+                          : `${fmtAny(days, lang)} ${tt("d remaining")}`}
                       </div>
                     </td>
                     <td><StatusBadge value={e.status} /></td>

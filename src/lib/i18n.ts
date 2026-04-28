@@ -292,6 +292,74 @@ const ar: Record<string, string> = {
   "samples": "عينات",
   "Save offline": "حفظ دون اتصال",
 
+  // Project / sample / equipment data
+  "NEOM The Line — Module 4 Foundations": "ذا لاين نيوم — أساسات الوحدة 4",
+  "Red Sea Coral Bloom — Resort Substructures": "البحر الأحمر كورال بلوم — هياكل المنتجع",
+  "Qiddiya Speed Park — Pavement": "قدية سبيد بارك — رصف",
+  "Diriyah Gate Heritage District": "بوابة الدرعية التراثية",
+
+  // Clients
+  "NEOM Co.": "شركة نيوم",
+  "Red Sea Global": "البحر الأحمر العالمية",
+  "Qiddiya Investment": "قدية للاستثمار",
+  "Diriyah Company": "شركة الدرعية",
+
+  // Cities
+  "Tabuk": "تبوك",
+  "Umluj": "أملج",
+  "Riyadh": "الرياض",
+  "Jeddah": "جدة",
+  "Dammam": "الدمام",
+  "Tabuk (NEOM)": "تبوك (نيوم)",
+  "Umluj (Red Sea)": "أملج (البحر الأحمر)",
+  "Riyadh (Qiddiya)": "الرياض (قدية)",
+  "Diriyah": "الدرعية",
+
+  // Engineers (mock data names)
+  "Eng. Khalid Al-Otaibi": "م. خالد العتيبي",
+  "Eng. Sarah Mansour": "م. سارة منصور",
+  "Eng. Faisal Al-Shehri": "م. فيصل الشهري",
+  "Eng. Layla Hashem": "م. ليلى هاشم",
+  "Eng. Fahad": "م. فهد",
+  "Eng. Sarah": "م. سارة",
+  "Eng. Mansour": "م. منصور",
+  "T. Ahmed": "ف. أحمد",
+  "T. Yousef": "ف. يوسف",
+  "T. Mahmoud": "ف. محمود",
+  "T. Ali": "ف. علي",
+
+  // Equipment / sample mock locations
+  "Pile cap PC-14": "هامة الركيزة PC-14",
+  "Slab S2-B": "بلاطة S2-B",
+  "Mixing plant tank 3": "خزان محطة الخلط 3",
+  "Borehole BH-08 @ 4.5m": "حفرة BH-08 على عمق 4.5 م",
+  "Crusher stockpile A": "مخزون الكسارة A",
+  "Plant batch B-217": "دفعة المحطة B-217",
+  "Rebar bundle RB-118 (Ø20)": "حزمة حديد RB-118 (Ø20)",
+  "Column CL-42": "عمود CL-42",
+  "Cement silo 2": "صومعة الإسمنت 2",
+
+  // Test names (commonly shown)
+  "Compressive Strength of Concrete": "مقاومة الانضغاط للخرسانة",
+  "Concrete Placement Temperature": "حرارة صب الخرسانة",
+  "Potable Water Analysis": "تحليل مياه الشرب",
+  "California Bearing Ratio": "نسبة تحمل كاليفورنيا",
+  "Sieve Analysis (Coarse Aggregate)": "تحليل المنخل (ركام خشن)",
+  "Marshall Stability & Flow": "ثبات وتدفق مارشال",
+  "Tensile Test (Rebar Ø20)": "اختبار الشد (حديد Ø20)",
+  "Cement Compressive Strength (Mortar)": "مقاومة انضغاط الإسمنت (مونة)",
+
+  "d overdue": "يوم متأخر",
+  "d remaining": "يوم متبقي",
+
+  // Equipment names
+  "Compression Machine 3000 kN": "آلة انضغاط 3000 ك.ن",
+  "Compression Machine 2000 kN": "آلة انضغاط 2000 ك.ن",
+  "Universal Testing Machine 600 kN": "آلة اختبار شاملة 600 ك.ن",
+  "Ignition Oven": "فرن الاشتعال",
+  "Nuclear Density Gauge": "مقياس كثافة نووي",
+  "pH / TDS Meter": "جهاز قياس pH / المواد الذائبة",
+
   // Settings extra
   "CR number": "رقم السجل التجاري",
   "VAT number": "الرقم الضريبي",

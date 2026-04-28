@@ -12,6 +12,9 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests, projects } from "@/lib/mock-data";
 import { useT } from "@/lib/i18n";
+import { useLoc } from "@/lib/i18n-data";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 const monthly = [
   { month: "Nov", tests: 184, passed: 171 },
@@ -45,6 +48,8 @@ const passFail = [
 
 export default function DashboardPage() {
   const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
   const recent = [...tests].slice(0, 6);
 
   return (
@@ -98,9 +103,9 @@ export default function DashboardPage() {
               .filter((p) => p.status === "active")
               .map((p) => (
                 <li key={p.id} className="text-sm">
-                  <div className="font-medium leading-tight">{p.name}</div>
+                  <div className="font-medium leading-tight">{loc(p.name)}</div>
                   <div className="text-xs text-[rgb(var(--muted))] mt-0.5">
-                    {p.code} • {p.city} • {p.client}
+                    {fmtAny(p.code, lang)} • {loc(p.city)} • {loc(p.client)}
                   </div>
                 </li>
               ))}
@@ -131,17 +136,17 @@ export default function DashboardPage() {
             <tbody>
               {recent.map((t) => (
                 <tr key={t.id}>
-                  <td className="font-mono text-xs">{t.code}</td>
+                  <td className="font-mono text-xs">{fmtAny(t.code, lang)}</td>
                   <td>
                     <Link href={`/tests/${t.id}`} className="hover:text-brand-600 hover:underline">
-                      {t.name}
+                      {loc(t.name)}
                     </Link>
                   </td>
                   <td className="text-xs text-[rgb(var(--muted))]">{t.standard}</td>
-                  <td>{t.testDate}</td>
+                  <td>{fmtAny(t.testDate, lang)}</td>
                   <td className="font-medium">
                     {t.primaryResult
-                      ? `${t.primaryResult.value} ${t.primaryResult.unit}`
+                      ? `${fmtAny(t.primaryResult.value, lang)} ${t.primaryResult.unit}`
                       : "—"}
                   </td>
                   <td>

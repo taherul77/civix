@@ -8,6 +8,9 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { tests } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useLoc } from "@/lib/i18n-data";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 const queue = tests.filter((t) => t.status === "submitted" || t.status === "reviewed");
 
@@ -17,6 +20,8 @@ export default function ReviewPage() {
   const [comment, setComment] = useState("");
   const [signed, setSigned] = useState(false);
   const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   const test = queue.find((t) => t.id === selected) ?? queue[0];
 
@@ -39,12 +44,12 @@ export default function ReviewPage() {
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-[rgb(var(--muted))]">{t.code}</span>
+                <span className="font-mono text-xs text-[rgb(var(--muted))]">{fmtAny(t.code, lang)}</span>
                 <StatusBadge value={t.status} />
               </div>
-              <div className="font-medium text-sm leading-tight mt-1">{t.name}</div>
+              <div className="font-medium text-sm leading-tight mt-1">{loc(t.name)}</div>
               <div className="flex items-center justify-between mt-2 text-xs text-[rgb(var(--muted))]">
-                <span>{t.testDate}</span>
+                <span>{fmtAny(t.testDate, lang)}</span>
                 <StatusBadge value={t.passFail} />
               </div>
             </button>
@@ -56,8 +61,8 @@ export default function ReviewPage() {
             <div className="card p-5">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-xs font-mono text-[rgb(var(--muted))]">{test.code}</div>
-                  <h2 className="text-xl font-semibold">{test.name}</h2>
+                  <div className="text-xs font-mono text-[rgb(var(--muted))]">{fmtAny(test.code, lang)}</div>
+                  <h2 className="text-xl font-semibold">{loc(test.name)}</h2>
                   <div className="text-sm text-[rgb(var(--muted))] mt-1">{test.standard}</div>
                 </div>
                 <Link href={`/tests/${test.id}/report`} className="btn btn-outline">{tt("View report →")}</Link>
@@ -70,16 +75,16 @@ export default function ReviewPage() {
                     ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
                     : "border-rose-500 bg-rose-50 dark:bg-rose-950/40"
                 )}>
-                  <div className="text-xs uppercase tracking-wider font-bold opacity-80">{test.primaryResult.label}</div>
-                  <div className="text-3xl font-bold mt-1">{test.primaryResult.value} <span className="text-base">{test.primaryResult.unit}</span></div>
+                  <div className="text-xs uppercase tracking-wider font-bold opacity-80">{loc(test.primaryResult.label)}</div>
+                  <div className="text-3xl font-bold mt-1">{fmtAny(test.primaryResult.value, lang)} <span className="text-base">{test.primaryResult.unit}</span></div>
                   <div className="mt-2"><StatusBadge value={test.passFail} /></div>
                 </div>
               )}
 
               <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                <KV label="Tested by" value={test.technician} />
-                <KV label="Test date"  value={test.testDate} />
-                <KV label="Status"     value={<StatusBadge value={test.status} />} />
+                <KV label={tt("Tested by")} value={loc(test.technician)} />
+                <KV label={tt("Test date")} value={fmtAny(test.testDate, lang)} />
+                <KV label={tt("Status")}    value={<StatusBadge value={test.status} />} />
               </div>
             </div>
 

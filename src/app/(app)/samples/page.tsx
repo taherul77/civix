@@ -7,6 +7,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { samples, projectById } from "@/lib/mock-data";
 import { useT } from "@/lib/i18n";
+import { useLoc } from "@/lib/i18n-data";
+import { useApp } from "@/store/app-store";
+import { fmtAny } from "@/lib/utils";
 
 const TYPES = ["all", "concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
 
@@ -14,6 +17,8 @@ export default function SamplesPage() {
   const [type, setType] = useState<(typeof TYPES)[number]>("all");
   const [q, setQ] = useState("");
   const tt = useT();
+  const loc = useLoc();
+  const lang = useApp((s) => s.lang);
 
   const filtered = useMemo(() => {
     return samples.filter((s) => {
@@ -75,12 +80,12 @@ export default function SamplesPage() {
                 const p = projectById(s.projectId);
                 return (
                   <tr key={s.id}>
-                    <td className="font-mono text-xs">{s.code}</td>
-                    <td className="capitalize">{s.type}</td>
-                    <td className="text-sm">{p?.name ?? "—"}</td>
-                    <td>{s.location}</td>
-                    <td>{s.date}</td>
-                    <td className="text-sm">{s.sampledBy}</td>
+                    <td className="font-mono text-xs">{fmtAny(s.code, lang)}</td>
+                    <td className="capitalize">{tt(s.type.charAt(0).toUpperCase() + s.type.slice(1))}</td>
+                    <td className="text-sm">{p ? loc(p.name) : "—"}</td>
+                    <td>{loc(s.location)}</td>
+                    <td>{fmtAny(s.date, lang)}</td>
+                    <td className="text-sm">{loc(s.sampledBy)}</td>
                     <td><StatusBadge value={s.status} /></td>
                   </tr>
                 );
