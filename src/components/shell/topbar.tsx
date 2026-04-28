@@ -12,6 +12,7 @@ import { useApp } from "@/store/app-store";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { notifications } from "@/lib/mock-extra";
+import { usePendingCount } from "@/lib/auto-translate";
 
 function humanize(seg: string) {
   return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -37,6 +38,7 @@ export function Topbar() {
   const tt = useT();
   const router = useRouter();
   const pathname = usePathname();
+  const pending = usePendingCount();
   const [open, setOpen] = useState<"user" | "bell" | "msg" | "apps" | "settings" | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -87,6 +89,12 @@ export function Topbar() {
 
       {/* Right side icons */}
       <div className="flex items-center gap-1 ml-auto">
+        {pending > 0 && (
+          <span className="hidden md:inline-flex items-center gap-1.5 text-[10px] font-medium text-brand-600 bg-brand-50 dark:bg-brand-500/10 rounded-full px-2.5 py-1 mr-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
+            {tt("Translating")}… {pending}
+          </span>
+        )}
         {/* Language flag */}
         <button onClick={() => setLang(lang === "en" ? "ar" : "en")} className="icon-btn" title={tt("Toggle language")}>
           <span className="text-xs font-bold leading-none">{lang === "en" ? "AR" : "EN"}</span>

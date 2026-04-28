@@ -29,6 +29,29 @@ npm run dev
 
 Open <http://localhost:3000>. Sign in with **any** email + password.
 
+### Optional — self-hosted auto-translation
+
+For Arabic mode the app uses a layered translator: hand-curated dictionary →
+bilingual API fields → **your own LibreTranslate server** for everything else.
+
+To run the translation server (free, open source, no rate limits):
+
+```bash
+docker compose -f docker-compose.translate.yml up -d
+```
+
+That's it — the app will auto-translate every uncached UI string locally.
+Downloaded language models persist in a Docker volume so they don't
+redownload on restart. Stop the server with:
+
+```bash
+docker compose -f docker-compose.translate.yml down
+```
+
+If LibreTranslate isn't running the app gracefully degrades: it just shows
+the static dictionary results and any bilingual `{ en, ar }` fields from the
+API. No errors are thrown.
+
 ## Pages delivered
 
 ### Operations

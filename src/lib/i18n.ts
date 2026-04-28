@@ -274,6 +274,7 @@ const ar: Record<string, string> = {
   "Apps": "التطبيقات",
   "Profile": "الملف الشخصي",
   "Profile settings": "إعدادات الملف",
+  "Translating": "جارٍ الترجمة",
 
   // Calendar legend
   "Calibration": "معايرة",
@@ -408,9 +409,24 @@ export function tr(lang: Lang, en: string): string {
   return ar[en] ?? en;
 }
 
+import { translateSync, useTranslationTick } from "@/lib/auto-translate";
+
+/**
+ * Hook: returns a translator function bound to current language.
+ *
+ *   tt("Active projects")   // → static dict if mapped, else auto-translated
+ *
+ * The component re-renders automatically when the auto-translate cache
+ * gets a new entry, so cold strings update on next render.
+ */
 export function useT() {
   const lang = useApp((s) => s.lang);
-  return (en: string) => tr(lang, en);
+  useTranslationTick();
+  return (en: string) => {
+    const dict = tr(lang, en);
+    if (dict !== en) return dict;
+    return translateSync(en, lang);
+  };
 }
 
 // ----- Legacy keyed dict (kept for older t(lang, key) callsites) -----

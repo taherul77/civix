@@ -1,0 +1,37 @@
+# Self-hosted LibreTranslate — your own translation server, no rate limits.
+#
+# Run it once:
+#   docker compose -f docker-compose.translate.yml up -d
+#
+# Then the app at http://localhost:3000 will auto-translate every UI string
+# using your local server at http://localhost:5000.
+#
+# To stop:
+#   docker compose -f docker-compose.translate.yml down
+#
+# To preload more languages, edit LT_LOAD_ONLY (e.g. en,ar,fr,de).
+
+version: "3.8"
+
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: civixlab-translate
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Only load English + Arabic models (~80 MB each) for fast startup.
+      LT_LOAD_ONLY: "en,ar"
+      # Allow cross-origin requests from the Next.js app.
+      LT_DISABLE_FILES_TRANSLATION: "true"
+      LT_DISABLE_WEB_UI: "false"
+      # No API key needed for local dev. To require one, set:
+      #   LT_API_KEYS: "true"
+      #   and add your key in .env.local: NEXT_PUBLIC_TRANSLATE_API_KEY=...
+    volumes:
+      # Persist downloaded language models so they don't redownload on each boot.
+      - lt-models:/home/libretranslate/.local/share/argos-translate
+
+volumes:
+  lt-models:
