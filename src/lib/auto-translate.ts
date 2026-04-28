@@ -210,7 +210,11 @@ export async function translateText(text: string, target: "en" | "ar"): Promise<
     return translated;
   });
   pending.set(key, promise);
-  notify();
+  // Defer: translateText is called synchronously from translateSync during
+  // render. A sync notify() here would call forceStoreRerender on every
+  // useSyncExternalStore subscriber (e.g. Sidebar) mid-render — exactly the
+  // "Cannot update a component while rendering another" warning.
+  queueMicrotask(notify);
   return promise;
 }
 
