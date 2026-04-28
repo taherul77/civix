@@ -81,17 +81,12 @@ export default function NewTestPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((t) => {
           const meta = categoryMeta[t.category];
-          const Wrapper: React.ElementType = t.formRoute ? Link : "div";
-          const href = t.formRoute ?? "#";
-          return (
-            <Wrapper
-              key={t.code}
-              href={href}
-              className={cn(
-                "card p-5 group relative overflow-hidden transition-all",
-                t.formRoute && "hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-              )}
-            >
+          const className = cn(
+            "card p-5 group relative overflow-hidden transition-all",
+            t.formRoute && "hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+          );
+          const inner = (
+            <>
               <div
                 className={cn(
                   "absolute -right-12 -top-12 w-32 h-32 rounded-full bg-gradient-to-br opacity-10 group-hover:opacity-20 transition-opacity",
@@ -132,7 +127,12 @@ export default function NewTestPage() {
                   </span>
                 )}
               </div>
-            </Wrapper>
+            </>
+          );
+          return t.formRoute ? (
+            <Link key={t.code} href={t.formRoute} className={className}>{inner}</Link>
+          ) : (
+            <div key={t.code} className={className}>{inner}</div>
           );
         })}
       </div>

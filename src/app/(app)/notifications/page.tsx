@@ -28,20 +28,16 @@ export default function NotificationsPage() {
       <div className="space-y-3">
         {notifications.map((n) => {
           const c = cfg[n.level];
-          const Wrapper: React.ElementType = n.href ? Link : "div";
-          return (
-            <Wrapper
-              key={n.id}
-              href={n.href ?? "#"}
-              className={cn(
-                "card p-4 flex items-start gap-3 border-l-4",
-                n.level === "error" && "border-l-rose-500",
-                n.level === "warn" && "border-l-amber-500",
-                n.level === "success" && "border-l-emerald-500",
-                n.level === "info" && "border-l-sky-500",
-                n.href && "hover:shadow-md transition-shadow cursor-pointer"
-              )}
-            >
+          const className = cn(
+            "card p-4 flex items-start gap-3 border-l-4",
+            n.level === "error" && "border-l-rose-500",
+            n.level === "warn" && "border-l-amber-500",
+            n.level === "success" && "border-l-emerald-500",
+            n.level === "info" && "border-l-sky-500",
+            n.href && "hover:shadow-md transition-shadow cursor-pointer"
+          );
+          const inner = (
+            <>
               <div className={cn("w-9 h-9 rounded-lg grid place-items-center shrink-0", c.tone)}>
                 <c.icon className="w-4 h-4" />
               </div>
@@ -53,7 +49,12 @@ export default function NotificationsPage() {
                 <div className="text-sm text-[rgb(var(--fg))]/80 mt-1">{n.body}</div>
               </div>
               {!n.read && <div className="w-2 h-2 rounded-full bg-brand-600 mt-2 shrink-0" />}
-            </Wrapper>
+            </>
+          );
+          return n.href ? (
+            <Link key={n.id} href={n.href} className={className}>{inner}</Link>
+          ) : (
+            <div key={n.id} className={className}>{inner}</div>
           );
         })}
       </div>
