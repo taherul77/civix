@@ -98,13 +98,25 @@ function ensureCacheLoaded() {
 // -----------------------------------------------------------------------
 
 const ARABIC_RE = /[؀-ۿ]/;
-const NON_TRANSLATABLE_RE = /^[A-Z0-9\-_·.\/:%°#\s,]+$/i;
+// Strict skip — only sample / project / test codes (uppercase prefixed
+// IDs with numbers and dashes), e.g.  PRJ-2026-001, S-26-04-1042, FV-9921,
+// 38.7, 28%, 2026-04-27. These are NEVER translated.
+const PURE_CODE_RE = /^[A-Z]{1,5}[\-_]\d/;             // PRJ-2026, S-26
+const PURE_NUMBER_RE = /^[\d.,%°\s\-:\/]+$/;            // 38.7, 28%, dates
+// Standard / organisation references (SASO, ASTM, SBC, GSO, AASHTO …) are
+// kept as-is by convention — Arabic engineering reports cite them in
+// English, same as the original spec. Set TRANSLATE_STANDARD_CODES = true
+// to override this.
+const TRANSLATE_STANDARD_CODES = false;
+const STANDARD_CODE_RE = /^(?:[A-Z]{2,6}(?:[\s\-\/][A-Z0-9\-]+)*\s?)+$/;
 
 const looksArabic = (s: string) => ARABIC_RE.test(s);
 function shouldSkip(s: string) {
   const t = s.trim();
   if (t.length < 2) return true;
-  if (NON_TRANSLATABLE_RE.test(t)) return true;
+  if (PURE_CODE_RE.test(t)) return true;
+  if (PURE_NUMBER_RE.test(t)) return true;
+  if (!TRANSLATE_STANDARD_CODES && STANDARD_CODE_RE.test(t)) return true;
   return false;
 }
 
