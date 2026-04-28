@@ -9,6 +9,7 @@ import {
   Inbox, FlaskConical, FolderKanban, FileBarChart2, Beaker, TestTube2,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { notifications } from "@/lib/mock-extra";
 
@@ -33,6 +34,7 @@ const messages = [
 
 export function Topbar() {
   const { lang, theme, setLang, setTheme, user, signOut, toggleSidebar } = useApp();
+  const tt = useT();
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState<"user" | "bell" | "msg" | "apps" | "settings" | null>(null);
@@ -40,7 +42,7 @@ export function Topbar() {
 
   const segments = pathname.split("/").filter(Boolean);
   const unread = notifications.filter((n) => !n.read).length;
-  const pageTitle = segments.length === 0 ? "Dashboard" : humanize(segments[segments.length - 1]);
+  const pageTitle = tt(segments.length === 0 ? "Dashboard" : humanize(segments[segments.length - 1]));
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -61,7 +63,7 @@ export function Topbar() {
       <button
         onClick={toggleSidebar}
         className="w-10 h-10 rounded-full border border-[rgb(var(--border))] grid place-items-center text-[rgb(var(--muted))] hover:text-brand-600 hover:border-brand-500/40 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-all shrink-0"
-        title="Toggle sidebar"
+        title={tt("Toggle sidebar")}
       >
         <Menu className="w-[18px] h-[18px]" />
       </button>
@@ -86,13 +88,13 @@ export function Topbar() {
       {/* Right side icons */}
       <div className="flex items-center gap-1 ml-auto">
         {/* Language flag */}
-        <button onClick={() => setLang(lang === "en" ? "ar" : "en")} className="icon-btn" title="Toggle language">
-          <span className="text-base leading-none">{lang === "en" ? "AR" : "EN"}</span>
+        <button onClick={() => setLang(lang === "en" ? "ar" : "en")} className="icon-btn" title={tt("Toggle language")}>
+          <span className="text-xs font-bold leading-none">{lang === "en" ? "AR" : "EN"}</span>
         </button>
 
         {/* Notifications */}
         <div className="relative">
-          <button onClick={() => setOpen(open === "bell" ? null : "bell")} className="icon-btn" title="Notifications">
+          <button onClick={() => setOpen(open === "bell" ? null : "bell")} className="icon-btn" title={tt("Notifications")}>
             <Bell className="w-[18px] h-[18px]" />
             {unread > 0 && (
               <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold grid place-items-center">{unread}</span>
@@ -103,7 +105,7 @@ export function Topbar() {
 
         {/* Messages */}
         <div className="relative">
-          <button onClick={() => setOpen(open === "msg" ? null : "msg")} className="icon-btn" title="Messages">
+          <button onClick={() => setOpen(open === "msg" ? null : "msg")} className="icon-btn" title={tt("Messages")}>
             <MessageSquare className="w-[18px] h-[18px]" />
             <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-cyan2-500 text-white text-[9px] font-bold grid place-items-center">3</span>
           </button>
@@ -112,19 +114,19 @@ export function Topbar() {
 
         {/* Apps */}
         <div className="relative">
-          <button onClick={() => setOpen(open === "apps" ? null : "apps")} className="icon-btn" title="Apps">
+          <button onClick={() => setOpen(open === "apps" ? null : "apps")} className="icon-btn" title={tt("Apps")}>
             <Grid3x3 className="w-[18px] h-[18px]" />
           </button>
           {open === "apps" && <AppsPanel onClose={() => setOpen(null)} />}
         </div>
 
         {/* Settings */}
-        <Link href="/settings" className="icon-btn" title="Settings">
+        <Link href="/settings" className="icon-btn" title={tt("Settings")}>
           <Settings className="w-[18px] h-[18px]" />
         </Link>
 
         {/* Theme */}
-        <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="icon-btn" title="Toggle theme">
+        <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="icon-btn" title={tt("Toggle theme")}>
           {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
         </button>
 
@@ -181,12 +183,13 @@ function PanelShell({ children, className }: { children: React.ReactNode; classN
 }
 
 function MsgPanel({ onClose }: { onClose: () => void }) {
+  const tt = useT();
   return (
     <PanelShell>
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-1 bg-gradient-to-r from-cyan2-500/10 to-brand-500/10">
         <div>
-          <div className="font-semibold text-sm">Messages</div>
-          <div className="text-[10px] text-[rgb(var(--muted))]">3 unread</div>
+          <div className="font-semibold text-sm">{tt("Messages")}</div>
+          <div className="text-[10px] text-[rgb(var(--muted))]">3 {tt("unread")}</div>
         </div>
         <Inbox className="w-4 h-4 text-cyan2-500" />
       </div>
@@ -202,19 +205,20 @@ function MsgPanel({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <Link href="#" onClick={onClose} className="block text-center text-xs text-brand-600 hover:underline py-2 border-t border-[rgb(var(--border))] mt-1 -mx-2 -mb-2 bg-[rgb(var(--hover))]/40">
-        View all messages
+        {tt("View all messages")}
       </Link>
     </PanelShell>
   );
 }
 
 function BellPanel({ onClose }: { onClose: () => void }) {
+  const tt = useT();
   return (
     <PanelShell>
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-1 bg-gradient-to-r from-brand-500/10 to-rose-500/10">
         <div>
-          <div className="font-semibold text-sm">Notifications</div>
-          <div className="text-[10px] text-[rgb(var(--muted))]">{notifications.filter((n) => !n.read).length} unread</div>
+          <div className="font-semibold text-sm">{tt("Notifications")}</div>
+          <div className="text-[10px] text-[rgb(var(--muted))]">{notifications.filter((n) => !n.read).length} {tt("unread")}</div>
         </div>
         <Bell className="w-4 h-4 text-rose-500" />
       </div>
@@ -246,17 +250,18 @@ function BellPanel({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <Link href="/notifications" onClick={onClose} className="block text-center text-xs text-brand-600 hover:underline py-2 border-t border-[rgb(var(--border))] mt-1 -mx-2 -mb-2 bg-[rgb(var(--hover))]/40">
-        View all
+        {tt("View all")}
       </Link>
     </PanelShell>
   );
 }
 
 function AppsPanel({ onClose }: { onClose: () => void }) {
+  const tt = useT();
   return (
     <PanelShell className="w-[300px]">
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-2">
-        <div className="font-semibold text-sm">Quick apps</div>
+        <div className="font-semibold text-sm">{tt("Quick apps")}</div>
       </div>
       <div className="grid grid-cols-3 gap-1.5">
         {apps.map((a) => (
@@ -269,7 +274,7 @@ function AppsPanel({ onClose }: { onClose: () => void }) {
             <div className={cn("w-12 h-12 rounded-xl grid place-items-center text-white shadow-md bg-gradient-to-br", a.tone)}>
               <a.icon className="w-5 h-5" />
             </div>
-            <span className="text-xs font-medium text-center">{a.name}</span>
+            <span className="text-xs font-medium text-center">{tt(a.name)}</span>
           </Link>
         ))}
       </div>
@@ -279,6 +284,7 @@ function AppsPanel({ onClose }: { onClose: () => void }) {
 
 function UserPanel({ onClose, onSignOut }: { onClose: () => void; onSignOut: () => void }) {
   const { user } = useApp();
+  const tt = useT();
   if (!user) return null;
   return (
     <PanelShell className="w-[280px]">
@@ -294,13 +300,13 @@ function UserPanel({ onClose, onSignOut }: { onClose: () => void; onSignOut: () 
       </div>
       <div className="py-1">
         <Link href="/settings" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-[rgb(var(--hover))]">
-          <User className="w-4 h-4" /> Profile
+          <User className="w-4 h-4" /> {tt("Profile")}
         </Link>
         <Link href="/security" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-[rgb(var(--hover))]">
-          <ShieldCheck className="w-4 h-4" /> Security & MFA
+          <ShieldCheck className="w-4 h-4" /> {tt("Security & MFA")}
         </Link>
         <Link href="/settings" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-[rgb(var(--hover))]">
-          <Settings className="w-4 h-4" /> Settings
+          <Settings className="w-4 h-4" /> {tt("Settings")}
         </Link>
       </div>
       <div className="py-1 border-t border-[rgb(var(--border))]">
@@ -308,7 +314,7 @@ function UserPanel({ onClose, onSignOut }: { onClose: () => void; onSignOut: () 
           onClick={onSignOut}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600"
         >
-          <LogOut className="w-4 h-4" /> Sign out
+          <LogOut className="w-4 h-4" /> {tt("Sign out")}
         </button>
       </div>
     </PanelShell>

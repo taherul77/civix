@@ -11,6 +11,7 @@ import {
 } from "@/components/dashboard/charts";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests, projects } from "@/lib/mock-data";
+import { useT } from "@/lib/i18n";
 
 const monthly = [
   { month: "Nov", tests: 184, passed: 171 },
@@ -43,6 +44,7 @@ const passFail = [
 ];
 
 export default function DashboardPage() {
+  const tt = useT();
   const recent = [...tests].slice(0, 6);
 
   return (
@@ -52,30 +54,30 @@ export default function DashboardPage() {
         description="Overview of laboratory activity, compliance, and equipment status."
         actions={
           <Link href="/tests/new" className="btn btn-primary">
-            <Plus className="w-4 h-4" /> New test
+            <Plus className="w-4 h-4" /> {tt("New test")}
           </Link>
         }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Tests today" value={27} delta={{ value: "+12% vs yesterday", trend: "up" }} icon={TestTube2} tone="brand" />
-        <KpiCard label="Pending review" value={14} delta={{ value: "3 new", trend: "up" }} icon={Clock} tone="sunset" />
-        <KpiCard label="Approved this month" value={309} delta={{ value: "+8.6% MoM", trend: "up" }} icon={CheckCircle2} tone="emerald" />
-        <KpiCard label="Overdue calibrations" value={2} delta={{ value: "EQ-CMP-02 · EQ-NCG-01", trend: "down" }} icon={AlertTriangle} tone="rose" />
+        <KpiCard label={tt("Tests today")} value={27} delta={{ value: tt("+12% vs yesterday"), trend: "up" }} icon={TestTube2} tone="brand" />
+        <KpiCard label={tt("Pending review")} value={14} delta={{ value: tt("3 new"), trend: "up" }} icon={Clock} tone="sunset" />
+        <KpiCard label={tt("Approved this month")} value={309} delta={{ value: tt("+8.6% MoM"), trend: "up" }} icon={CheckCircle2} tone="emerald" />
+        <KpiCard label={tt("Overdue calibrations")} value={2} delta={{ value: "EQ-CMP-02 · EQ-NCG-01", trend: "down" }} icon={AlertTriangle} tone="rose" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Monthly test volume</h3>
-            <span className="text-xs text-[rgb(var(--muted))]">Last 6 months</span>
+            <h3 className="font-semibold">{tt("Monthly test volume")}</h3>
+            <span className="text-xs text-[rgb(var(--muted))]">{tt("Last 6 months")}</span>
           </div>
           <MonthlyVolumeChart data={monthly} />
         </div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">By category</h3>
-            <span className="text-xs text-[rgb(var(--muted))]">This month</span>
+            <h3 className="font-semibold">{tt("By category")}</h3>
+            <span className="text-xs text-[rgb(var(--muted))]">{tt("This month")}</span>
           </div>
           <CategoryPie data={byCategory} />
         </div>
@@ -84,13 +86,13 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Pass / fail by category</h3>
-            <span className="text-xs text-[rgb(var(--muted))]">Last 30 days</span>
+            <h3 className="font-semibold">{tt("Pass / fail by category")}</h3>
+            <span className="text-xs text-[rgb(var(--muted))]">{tt("Last 30 days")}</span>
           </div>
           <PassFailBar data={passFail} />
         </div>
         <div className="card p-5">
-          <h3 className="font-semibold mb-3">Active projects</h3>
+          <h3 className="font-semibold mb-3">{tt("Active projects")}</h3>
           <ul className="space-y-3">
             {projects
               .filter((p) => p.status === "active")
@@ -108,22 +110,22 @@ export default function DashboardPage() {
 
       <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Recent tests</h3>
+          <h3 className="font-semibold">{tt("Recent tests")}</h3>
           <Link href="/tests" className="text-sm text-brand-600 hover:underline">
-            View all
+            {tt("View all")}
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="civix">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Test</th>
-                <th>Standard</th>
-                <th>Date</th>
-                <th>Result</th>
-                <th>Status</th>
-                <th>P/F</th>
+                <th>{tt("Code")}</th>
+                <th>{tt("Test")}</th>
+                <th>{tt("Standard")}</th>
+                <th>{tt("Date")}</th>
+                <th>{tt("Result")}</th>
+                <th>{tt("Status")}</th>
+                <th>{tt("P/F")}</th>
               </tr>
             </thead>
             <tbody>

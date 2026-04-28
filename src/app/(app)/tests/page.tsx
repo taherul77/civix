@@ -6,6 +6,7 @@ import { Plus, Filter, FileCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests, sampleById, projectById } from "@/lib/mock-data";
+import { useT } from "@/lib/i18n";
 
 const STATUS = ["all", "draft", "submitted", "reviewed", "approved"] as const;
 const CATS = ["all", "concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
@@ -14,6 +15,7 @@ export default function TestsPage() {
   const [status, setStatus] = useState<(typeof STATUS)[number]>("all");
   const [cat, setCat] = useState<(typeof CATS)[number]>("all");
   const [q, setQ] = useState("");
+  const tt = useT();
 
   const filtered = useMemo(() => {
     return tests.filter((t) => {
@@ -31,7 +33,7 @@ export default function TestsPage() {
         description="All test runs across projects with full traceability."
         actions={
           <Link href="/tests/new" className="btn btn-primary">
-            <Plus className="w-4 h-4" /> New test
+            <Plus className="w-4 h-4" /> {tt("New test")}
           </Link>
         }
       />
@@ -39,19 +41,19 @@ export default function TestsPage() {
       <div className="card p-3 flex flex-wrap items-center gap-2">
         <Filter className="w-4 h-4 text-[rgb(var(--muted))] mx-2" />
         <select value={status} onChange={(e) => setStatus(e.target.value as never)} className="input w-auto">
-          {STATUS.map((s) => <option key={s} value={s} className="capitalize">{s === "all" ? "All status" : s}</option>)}
+          {STATUS.map((s) => <option key={s} value={s} className="capitalize">{s === "all" ? tt("All status") : tt(s.charAt(0).toUpperCase() + s.slice(1))}</option>)}
         </select>
         <select value={cat} onChange={(e) => setCat(e.target.value as never)} className="input w-auto">
-          {CATS.map((c) => <option key={c} value={c} className="capitalize">{c === "all" ? "All categories" : c}</option>)}
+          {CATS.map((c) => <option key={c} value={c} className="capitalize">{c === "all" ? tt("All categories") : tt(c.charAt(0).toUpperCase() + c.slice(1))}</option>)}
         </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by code, name, or standard..."
+          placeholder={tt("Search by code, name, or standard...")}
           className="input flex-1 min-w-[240px]"
         />
         <div className="text-xs text-[rgb(var(--muted))] px-2">
-          {filtered.length} of {tests.length}
+          {filtered.length} {tt("of")} {tests.length}
         </div>
       </div>
 
@@ -60,14 +62,14 @@ export default function TestsPage() {
           <table className="civix">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Test</th>
-                <th>Project / Sample</th>
-                <th>Standard</th>
-                <th>Date</th>
-                <th>Result</th>
-                <th>Status</th>
-                <th>P/F</th>
+                <th>{tt("Code")}</th>
+                <th>{tt("Test")}</th>
+                <th>{tt("Project / Sample")}</th>
+                <th>{tt("Standard")}</th>
+                <th>{tt("Date")}</th>
+                <th>{tt("Result")}</th>
+                <th>{tt("Status")}</th>
+                <th>{tt("P/F")}</th>
                 <th></th>
               </tr>
             </thead>

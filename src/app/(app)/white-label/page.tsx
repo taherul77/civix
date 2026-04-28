@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Palette, FlaskConical, Save } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useT } from "@/lib/i18n";
 
 const presets = [
   { name: "Aramco Blue",   primary: "#0033A0", accent: "#00B5E2" },
@@ -12,6 +13,7 @@ const presets = [
 ];
 
 export default function WhiteLabelPage() {
+  const tt = useT();
   const [primary, setPrimary] = useState("#2563eb");
   const [accent, setAccent] = useState("#0ea5e9");
   const [labName, setLabName] = useState("Saudi Aramco Materials Lab");
@@ -29,7 +31,7 @@ export default function WhiteLabelPage() {
       <PageHeader
         title="White-label & report template"
         description="Customize branding, colors, headers and disclaimers per tenant."
-        actions={<button className="btn btn-primary"><Save className="w-4 h-4" /> Save changes</button>}
+        actions={<button className="btn btn-primary"><Save className="w-4 h-4" /> {tt("Save changes")}</button>}
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

@@ -5,6 +5,7 @@ import { Search, Download, Shield } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { audit } from "@/lib/mock-extra";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const actionTone: Record<string, string> = {
   create: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
@@ -19,6 +20,7 @@ const actionTone: Record<string, string> = {
 
 export default function AuditPage() {
   const [q, setQ] = useState("");
+  const tt = useT();
   const filtered = useMemo(
     () => audit.filter((a) => !q || `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q.toLowerCase())),
     [q]
@@ -28,7 +30,7 @@ export default function AuditPage() {
       <PageHeader
         title="Audit log"
         description="ISO 17025 §8.4 immutable audit trail. 7-year retention."
-        actions={<button className="btn btn-outline"><Download className="w-4 h-4" /> Export CSV</button>}
+        actions={<button className="btn btn-outline"><Download className="w-4 h-4" /> {tt("Export CSV")}</button>}
       />
 
       <div className="card p-3 flex items-center gap-2">
@@ -36,11 +38,11 @@ export default function AuditPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by user, entity, action..."
+          placeholder={tt("Search by user, entity, action...")}
           className="input flex-1"
         />
         <div className="flex items-center gap-1 text-xs text-[rgb(var(--muted))] px-2">
-          <Shield className="w-3.5 h-3.5" /> Tamper-evident · SHA-256 chained
+          <Shield className="w-3.5 h-3.5" /> {tt("Tamper-evident · SHA-256 chained")}
         </div>
       </div>
 
@@ -49,13 +51,13 @@ export default function AuditPage() {
           <table className="civix">
             <thead>
               <tr>
-                <th>Timestamp</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Entity ID</th>
-                <th>Diff</th>
-                <th>IP</th>
+                <th>{tt("Timestamp")}</th>
+                <th>{tt("User")}</th>
+                <th>{tt("Action")}</th>
+                <th>{tt("Entity")}</th>
+                <th>{tt("Entity ID")}</th>
+                <th>{tt("Diff")}</th>
+                <th>{tt("IP")}</th>
               </tr>
             </thead>
             <tbody>

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const queue = tests.filter((t) => t.status === "submitted" || t.status === "reviewed");
 
@@ -15,6 +16,7 @@ export default function ReviewPage() {
   const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
   const [comment, setComment] = useState("");
   const [signed, setSigned] = useState(false);
+  const tt = useT();
 
   const test = queue.find((t) => t.id === selected) ?? queue[0];
 
@@ -58,7 +60,7 @@ export default function ReviewPage() {
                   <h2 className="text-xl font-semibold">{test.name}</h2>
                   <div className="text-sm text-[rgb(var(--muted))] mt-1">{test.standard}</div>
                 </div>
-                <Link href={`/tests/${test.id}/report`} className="btn btn-outline">View report →</Link>
+                <Link href={`/tests/${test.id}/report`} className="btn btn-outline">{tt("View report →")}</Link>
               </div>
 
               {test.primaryResult && (
@@ -82,13 +84,13 @@ export default function ReviewPage() {
             </div>
 
             <div className="card p-5 space-y-4">
-              <h3 className="font-semibold flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Reviewer comments</h3>
+              <h3 className="font-semibold flex items-center gap-2"><MessageSquare className="w-4 h-4" /> {tt("Reviewer comments")}</h3>
               <textarea
                 rows={3}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 className="input"
-                placeholder="Add your review notes (visible in audit log)..."
+                placeholder={tt("Add your review notes (visible in audit log)...")}
               />
 
               <div className="flex flex-wrap gap-2">
@@ -98,7 +100,7 @@ export default function ReviewPage() {
                     decision === "approve" ? "bg-emerald-600 text-white" : "btn-outline"
                   )}
                 >
-                  <CheckCircle2 className="w-4 h-4" /> Approve
+                  <CheckCircle2 className="w-4 h-4" /> {tt("Approve")}
                 </button>
                 <button
                   onClick={() => setDecision("reject")}
@@ -106,14 +108,14 @@ export default function ReviewPage() {
                     decision === "reject" ? "bg-rose-600 text-white" : "btn-outline"
                   )}
                 >
-                  <XCircle className="w-4 h-4" /> Return for correction
+                  <XCircle className="w-4 h-4" /> {tt("Return for correction")}
                 </button>
               </div>
 
               {decision === "approve" && (
                 <div className="rounded-lg border border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-950/40 p-4 space-y-3">
                   <div className="text-sm font-semibold flex items-center gap-2">
-                    <FileSignature className="w-4 h-4" /> Digital signature required
+                    <FileSignature className="w-4 h-4" /> {tt("Digital signature required")}
                   </div>
                   <p className="text-xs">
                     By signing, you certify the result conforms to the referenced standard. The test
@@ -124,7 +126,7 @@ export default function ReviewPage() {
                     disabled={signed}
                     className="btn btn-primary w-full"
                   >
-                    <Lock className="w-4 h-4" /> {signed ? "Signed & locked" : "Sign with PKCS#12 certificate"}
+                    <Lock className="w-4 h-4" /> {signed ? tt("Signed & locked") : tt("Sign with PKCS#12 certificate")}
                   </button>
                   {signed && (
                     <div className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1">

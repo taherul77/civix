@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Camera, MapPin, ScanLine, WifiOff, Wifi, Save, ChevronRight, Check } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export default function FieldPage() {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(3);
   const [step, setStep] = useState(1);
   const [type, setType] = useState("concrete");
+  const tt = useT();
 
   return (
     <div className="space-y-6">
@@ -38,8 +40,8 @@ export default function FieldPage() {
               {/* header */}
               <div className="px-5 py-3 border-b border-[rgb(var(--border))] flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-[rgb(var(--muted))]">Step {step} of 4</div>
-                  <h2 className="text-lg font-bold">New sample</h2>
+                  <div className="text-xs text-[rgb(var(--muted))]">{tt("Step")} {step} {tt("of")} 4</div>
+                  <h2 className="text-lg font-bold">{tt("New sample")}</h2>
                 </div>
                 <button onClick={() => setOnline(!online)} className="text-[10px] underline">
                   toggle net
@@ -137,15 +139,15 @@ export default function FieldPage() {
               <div className="border-t border-[rgb(var(--border))] p-3 space-y-2">
                 {step < 4 ? (
                   <button onClick={() => setStep(step + 1)} className="btn btn-primary w-full">
-                    Continue <ChevronRight className="w-4 h-4" />
+                    {tt("Continue")} <ChevronRight className="w-4 h-4" />
                   </button>
                 ) : (
                   <button onClick={() => { setStep(1); setPending(pending + 1); }} className="btn btn-primary w-full">
-                    <Save className="w-4 h-4" /> {online ? "Submit" : "Save offline"}
+                    <Save className="w-4 h-4" /> {online ? tt("Submit") : tt("Save offline")}
                   </button>
                 )}
                 {step > 1 && (
-                  <button onClick={() => setStep(step - 1)} className="btn btn-ghost w-full">Back</button>
+                  <button onClick={() => setStep(step - 1)} className="btn btn-ghost w-full">{tt("Back")}</button>
                 )}
               </div>
             </div>
@@ -155,7 +157,7 @@ export default function FieldPage() {
         {/* Side info */}
         <div className="space-y-4">
           <div className="card p-5">
-            <h3 className="font-semibold mb-3">Field-tech features</h3>
+            <h3 className="font-semibold mb-3">{tt("Field-tech features")}</h3>
             <ul className="space-y-3 text-sm">
               <Feature label="Offline-first SQLite cache" />
               <Feature label="GPS coordinates with accuracy band (Expo Location)" />
@@ -169,8 +171,8 @@ export default function FieldPage() {
 
           <div className="card p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">Pending sync</h3>
-              <span className="badge badge-warn">{pending} samples</span>
+              <h3 className="font-semibold">{tt("Pending sync")}</h3>
+              <span className="badge badge-warn">{pending} {tt("samples")}</span>
             </div>
             <p className="text-sm text-[rgb(var(--muted))]">
               Samples captured offline will sync automatically when the device reconnects.

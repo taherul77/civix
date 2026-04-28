@@ -6,12 +6,14 @@ import { Plus, Filter } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { samples, projectById } from "@/lib/mock-data";
+import { useT } from "@/lib/i18n";
 
 const TYPES = ["all", "concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
 
 export default function SamplesPage() {
   const [type, setType] = useState<(typeof TYPES)[number]>("all");
   const [q, setQ] = useState("");
+  const tt = useT();
 
   const filtered = useMemo(() => {
     return samples.filter((s) => {
@@ -28,7 +30,7 @@ export default function SamplesPage() {
         description="All samples received with chain-of-custody tracking."
         actions={
           <button className="btn btn-primary">
-            <Plus className="w-4 h-4" /> New sample
+            <Plus className="w-4 h-4" /> {tt("New sample")}
           </button>
         }
       />
@@ -42,14 +44,14 @@ export default function SamplesPage() {
         >
           {TYPES.map((t) => (
             <option key={t} value={t} className="capitalize">
-              {t === "all" ? "All types" : t}
+              {t === "all" ? tt("All types") : tt(t.charAt(0).toUpperCase() + t.slice(1))}
             </option>
           ))}
         </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by code or location..."
+          placeholder={tt("Search by code or location...")}
           className="input flex-1 min-w-[200px]"
         />
       </div>
@@ -59,13 +61,13 @@ export default function SamplesPage() {
           <table className="civix">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Type</th>
-                <th>Project</th>
-                <th>Location</th>
-                <th>Sampled</th>
-                <th>By</th>
-                <th>Status</th>
+                <th>{tt("Code")}</th>
+                <th>{tt("Type")}</th>
+                <th>{tt("Project")}</th>
+                <th>{tt("Location")}</th>
+                <th>{tt("Date")}</th>
+                <th>{tt("By")}</th>
+                <th>{tt("Status")}</th>
               </tr>
             </thead>
             <tbody>

@@ -5,6 +5,7 @@ import { AlertTriangle, AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { notifications } from "@/lib/mock-extra";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const cfg = {
   info:    { icon: Info,           tone: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900" },
@@ -14,13 +15,14 @@ const cfg = {
 };
 
 export default function NotificationsPage() {
+  const tt = useT();
   const unread = notifications.filter((n) => !n.read).length;
   return (
     <div className="space-y-6">
       <PageHeader
         title="Notifications & alerts"
-        description={`${unread} unread · escalations route to Quality Manager.`}
-        actions={<button className="btn btn-outline">Mark all read</button>}
+        description={`${unread} ${tt("unread")} · ${tt("escalations route to Quality Manager.")}`}
+        actions={<button className="btn btn-outline">{tt("Mark all read")}</button>}
       />
 
       <div className="space-y-3">

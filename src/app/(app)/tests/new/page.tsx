@@ -6,12 +6,14 @@ import { Search, ArrowRight, Sparkles, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { catalog, categoryMeta, type CatalogEntry } from "@/lib/test-catalog";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 type Cat = CatalogEntry["category"] | "all" | "saudi";
 
 export default function NewTestPage() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<Cat>("all");
+  const tt = useT();
 
   const cats: { id: Cat; label: string; count: number }[] = useMemo(() => {
     const all = catalog.length;
@@ -49,7 +51,7 @@ export default function NewTestPage() {
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by name, code, or standard…"
+            placeholder={tt("Search by name, code, or standard…")}
             className="input pl-9"
           />
         </div>
@@ -67,7 +69,7 @@ export default function NewTestPage() {
               )}
             >
               {c.id === "saudi" && <ShieldCheck className="w-3 h-3" />}
-              {c.label}
+              {tt(c.label)}
               <span className={cn("px-1.5 rounded-full text-[10px]", cat === c.id ? "bg-white/20" : "bg-[rgb(var(--border))]")}>
                 {c.count}
               </span>
@@ -103,11 +105,11 @@ export default function NewTestPage() {
                     meta.tone
                   )}
                 >
-                  {meta.label}
+                  {tt(meta.label)}
                 </div>
                 {t.saudiSpecific && (
                   <span className="badge badge-pass inline-flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Saudi
+                    <ShieldCheck className="w-3 h-3" /> {tt("Saudi")}
                   </span>
                 )}
               </div>
@@ -122,11 +124,11 @@ export default function NewTestPage() {
               <div className="mt-4 flex items-center justify-between">
                 {t.formRoute ? (
                   <span className="text-sm font-medium text-brand-600 group-hover:gap-2 inline-flex items-center gap-1 transition-all">
-                    Start test <ArrowRight className="w-3.5 h-3.5" />
+                    {tt("Start test")} <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 ) : (
                   <span className="text-xs text-[rgb(var(--muted))] inline-flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Coming soon
+                    <Sparkles className="w-3.5 h-3.5" /> {tt("Coming soon")}
                   </span>
                 )}
               </div>
@@ -137,7 +139,7 @@ export default function NewTestPage() {
 
       {filtered.length === 0 && (
         <div className="card p-10 text-center text-[rgb(var(--muted))]">
-          No tests match your filters.
+          {tt("No tests match your filters.")}
         </div>
       )}
     </div>

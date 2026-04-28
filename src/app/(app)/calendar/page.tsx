@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, FlaskConical, Wrench, Beaker } from "lucide-
 import { PageHeader } from "@/components/ui/page-header";
 import { events } from "@/lib/mock-extra";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const typeMap: Record<string, { color: string; icon: typeof FlaskConical }> = {
   test: { color: "bg-brand-500", icon: FlaskConical },
@@ -21,6 +22,7 @@ function fmt(d: Date) {
 
 export default function CalendarPage() {
   const [cursor, setCursor] = useState(new Date(2026, 3, 1)); // April 2026
+  const tt = useT();
   const monthLabel = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   const start = startOfMonth(cursor);
@@ -53,7 +55,7 @@ export default function CalendarPage() {
             {(Object.keys(typeMap) as (keyof typeof typeMap)[]).map((k) => (
               <span key={k} className="flex items-center gap-1.5 capitalize">
                 <span className={cn("w-2.5 h-2.5 rounded-full", typeMap[k].color)} />
-                {k}
+                {tt(k.charAt(0).toUpperCase() + k.slice(1))}
               </span>
             ))}
           </div>
@@ -84,20 +86,21 @@ export default function CalendarPage() {
                     <div className="space-y-1">
                       {dayEvents.map((e) => {
                         const t = typeMap[e.type];
-                        const Wrapper: React.ElementType = e.href ? Link : "div";
-                        return (
-                          <Wrapper
-                            key={e.id}
-                            href={e.href ?? "#"}
-                            className={cn(
-                              "block text-[10px] px-1.5 py-1 rounded text-white truncate",
-                              t.color,
-                              e.href && "hover:opacity-90 cursor-pointer"
-                            )}
-                          >
+                        const className = cn(
+                          "block text-[10px] px-1.5 py-1 rounded text-white truncate",
+                          t.color,
+                          e.href && "hover:opacity-90 cursor-pointer"
+                        );
+                        const inner = (
+                          <>
                             <t.icon className="w-2.5 h-2.5 inline-block mr-1 -mt-0.5" />
                             {e.title}
-                          </Wrapper>
+                          </>
+                        );
+                        return e.href ? (
+                          <Link key={e.id} href={e.href} className={className}>{inner}</Link>
+                        ) : (
+                          <div key={e.id} className={className}>{inner}</div>
                         );
                       })}
                     </div>

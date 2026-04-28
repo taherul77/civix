@@ -23,7 +23,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
-import { t, type DictKey } from "@/lib/i18n";
+import { t, useT, type DictKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface Item { href: string; key: DictKey | string; label?: string; icon: typeof LayoutDashboard; badge?: string; badgeTone?: "rose" | "cyan" | "amber" }
@@ -77,6 +77,7 @@ const badgeToneMap = {
 export function Sidebar() {
   const pathname = usePathname();
   const { lang, sidebarCollapsed } = useApp();
+  const tt = useT();
   const collapsed = sidebarCollapsed;
 
   return (
@@ -99,9 +100,9 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="sidebar-label">
-            <div className="text-xl font-bold tracking-tight gradient-text">{t(lang, "appName")}</div>
+            <div className="text-xl font-bold tracking-tight gradient-text">{tt(t(lang, "appName"))}</div>
             <div className="text-[10px] uppercase tracking-[0.15em] text-[rgb(var(--muted))] -mt-0.5">
-              ISO 17025 · SAAC
+              {tt("ISO 17025 · SAAC")}
             </div>
           </div>
         )}
@@ -115,12 +116,13 @@ export function Sidebar() {
               "sidebar-section-title px-3 mb-1.5 text-[10px] uppercase tracking-[0.18em] text-[rgb(var(--muted))] font-bold",
               collapsed && "h-0 mb-0 overflow-hidden"
             )}>
-              {g.title}
+              {tt(g.title)}
             </div>
             <div className="space-y-0.5">
               {g.items.map(({ href, key, label, icon: Icon, badge, badgeTone = "rose" }) => {
                 const active = pathname === href || pathname.startsWith(href + "/");
-                const text = label ?? t(lang, key as DictKey);
+                const baseLabel = label ?? t(lang, key as DictKey);
+                const text = tt(baseLabel);
                 return (
                   <Link
                     key={href}
@@ -175,8 +177,8 @@ export function Sidebar() {
                 <ShieldCheck className="w-3.5 h-3.5" />
               </div>
               <div>
-                <div className="text-xs font-bold leading-tight">SBC 304 Compliant</div>
-                <div className="text-[10px] text-[rgb(var(--muted))]">SASO · GSO · ASTM</div>
+                <div className="text-xs font-bold leading-tight">{tt("SBC 304 Compliant")}</div>
+                <div className="text-[10px] text-[rgb(var(--muted))]">{tt("SASO · GSO · ASTM")}</div>
               </div>
             </div>
           </div>

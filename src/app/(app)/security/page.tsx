@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Shield, Smartphone, KeyRound, Copy, CheckCircle2, Building2, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 const samlProviders = [
   { id: "azure",  name: "Azure AD",        status: "configured", users: 41, color: "from-sky-600 to-blue-700" },
@@ -15,6 +16,7 @@ const samlProviders = [
 export default function SecurityPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [code, setCode] = useState("");
+  const tt = useT();
   const secret = "JBSWY3DPEHPK3PXP";
 
   return (
@@ -24,7 +26,7 @@ export default function SecurityPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* MFA */}
         <div className="card p-5">
-          <h3 className="font-semibold mb-4 flex items-center gap-2"><Smartphone className="w-4 h-4" /> Two-factor authentication</h3>
+          <h3 className="font-semibold mb-4 flex items-center gap-2"><Smartphone className="w-4 h-4" /> {tt("Two-factor authentication")}</h3>
 
           <div className="flex items-center gap-2 mb-4">
             {[1, 2, 3].map((n) => (
@@ -54,7 +56,7 @@ export default function SecurityPage() {
                   <button className="btn btn-outline px-3"><Copy className="w-4 h-4" /></button>
                 </div>
               </div>
-              <button onClick={() => setStep(2)} className="btn btn-primary w-full">Continue</button>
+              <button onClick={() => setStep(2)} className="btn btn-primary w-full">{tt("Continue")}</button>
             </div>
           )}
 
@@ -72,7 +74,7 @@ export default function SecurityPage() {
                 disabled={code.length !== 6}
                 className="btn btn-primary w-full"
               >
-                Verify
+                {tt("Verify")}
               </button>
             </div>
           )}
@@ -97,7 +99,7 @@ export default function SecurityPage() {
                   ))}
                 </div>
               </div>
-              <button onClick={() => setStep(1)} className="btn btn-outline w-full">Re-enrol</button>
+              <button onClick={() => setStep(1)} className="btn btn-outline w-full">{tt("Re-enrol")}</button>
             </div>
           )}
         </div>
@@ -105,8 +107,8 @@ export default function SecurityPage() {
         {/* SAML / SSO */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold flex items-center gap-2"><Building2 className="w-4 h-4" /> SAML 2.0 SSO</h3>
-            <button className="btn btn-outline px-3"><Plus className="w-4 h-4" /> Add</button>
+            <h3 className="font-semibold flex items-center gap-2"><Building2 className="w-4 h-4" /> {tt("SAML 2.0 SSO")}</h3>
+            <button className="btn btn-outline px-3"><Plus className="w-4 h-4" /> {tt("Add")}</button>
           </div>
           <div className="space-y-3">
             {samlProviders.map((p) => (
@@ -134,7 +136,7 @@ export default function SecurityPage() {
 
         {/* Policies */}
         <div className="card p-5 xl:col-span-2">
-          <h3 className="font-semibold mb-4 flex items-center gap-2"><Shield className="w-4 h-4" /> Access policies</h3>
+          <h3 className="font-semibold mb-4 flex items-center gap-2"><Shield className="w-4 h-4" /> {tt("Access policies")}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <Policy label="Password min length" value="12 characters" />
             <Policy label="Password complexity" value="Upper + lower + digit + symbol" />

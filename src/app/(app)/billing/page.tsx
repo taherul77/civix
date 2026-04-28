@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Receipt, FileText, ShieldCheck, Download, ExternalLink, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useT } from "@/lib/i18n";
 
 const invoices = [
   { id: "INV-2026-0418", client: "NEOM Co.",          amount: 87_500,  vat: 13_125, status: "paid",     date: "2026-04-12", zatca: "ZX-A8B12C" },
@@ -12,19 +13,20 @@ const invoices = [
 ];
 
 export default function BillingPage() {
+  const tt = useT();
   const totalInv = invoices.reduce((a, b) => a + b.amount + b.vat, 0);
   return (
     <div className="space-y-6">
       <PageHeader
         title="Billing — ZATCA & Etimad"
         description="VAT e-invoicing (Phase 2) and government procurement integration."
-        actions={<button className="btn btn-primary"><Plus className="w-4 h-4" /> New invoice</button>}
+        actions={<button className="btn btn-primary"><Plus className="w-4 h-4" /> {tt("New invoice")}</button>}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Invoices YTD" value={invoices.length} icon={Receipt} />
-        <Stat label="Revenue YTD (SAR)" value={totalInv.toLocaleString()} icon={FileText} />
-        <Stat label="ZATCA compliance" value="Phase 2 ✓" icon={ShieldCheck} tone="emerald" />
+        <Stat label={tt("Invoices YTD")} value={invoices.length} icon={Receipt} />
+        <Stat label={tt("Revenue YTD (SAR)")} value={totalInv.toLocaleString()} icon={FileText} />
+        <Stat label={tt("ZATCA compliance")} value="Phase 2 ✓" icon={ShieldCheck} tone="emerald" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -61,18 +63,18 @@ export default function BillingPage() {
       </div>
 
       <div className="card overflow-hidden">
-        <h3 className="font-semibold p-4 border-b border-[rgb(var(--border))]">Recent invoices</h3>
+        <h3 className="font-semibold p-4 border-b border-[rgb(var(--border))]">{tt("Recent invoices")}</h3>
         <div className="overflow-x-auto">
           <table className="civix">
             <thead>
               <tr>
-                <th>Invoice</th>
-                <th>Client</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>VAT (15%)</th>
-                <th>ZATCA UUID</th>
-                <th>Status</th>
+                <th>{tt("Invoice")}</th>
+                <th>{tt("Client")}</th>
+                <th>{tt("Date")}</th>
+                <th>{tt("Amount")}</th>
+                <th>{tt("VAT (15%)")}</th>
+                <th>{tt("ZATCA UUID")}</th>
+                <th>{tt("Status")}</th>
                 <th></th>
               </tr>
             </thead>

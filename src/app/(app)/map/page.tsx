@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { sitesGeo } from "@/lib/mock-extra";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 // Saudi Arabia bounding box (very approximate)
 const minLat = 16, maxLat = 33;
@@ -33,6 +34,7 @@ const typeColor: Record<string, string> = {
 
 export default function MapPage() {
   const [hovered, setHovered] = useState<typeof sitesGeo[number] | null>(null);
+  const tt = useT();
 
   return (
     <div className="space-y-6">
@@ -90,7 +92,7 @@ export default function MapPage() {
         </div>
 
         <div className="card p-4 space-y-2">
-          <h3 className="font-semibold mb-2">Locations ({sitesGeo.length})</h3>
+          <h3 className="font-semibold mb-2">{tt("Locations")} ({sitesGeo.length})</h3>
           {sitesGeo.map((s) => {
             const c = typeColor[s.type] ?? "#64748b";
             return (

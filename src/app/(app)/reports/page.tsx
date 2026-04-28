@@ -5,8 +5,10 @@ import { FileText, Download } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { tests } from "@/lib/mock-data";
+import { useT } from "@/lib/i18n";
 
 export default function ReportsPage() {
+  const tt = useT();
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" description="Generated reports with digital signatures and verification QR codes." />
@@ -32,7 +34,7 @@ export default function ReportsPage() {
             <div className="mt-4 pt-4 border-t border-[rgb(var(--border))] flex items-center justify-between text-xs">
               <span className="text-[rgb(var(--muted))]">{t.testDate}</span>
               <span className="text-brand-600 font-medium inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                <Download className="w-3.5 h-3.5" /> View report
+                <Download className="w-3.5 h-3.5" /> {tt("View report")}
               </span>
             </div>
           </Link>

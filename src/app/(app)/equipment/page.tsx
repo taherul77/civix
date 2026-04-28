@@ -4,6 +4,7 @@ import { Plus, Wrench, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { equipment } from "@/lib/mock-data";
+import { useT } from "@/lib/i18n";
 
 function daysUntil(date: string) {
   const d = (new Date(date).getTime() - Date.now()) / 86400000;
@@ -11,6 +12,7 @@ function daysUntil(date: string) {
 }
 
 export default function EquipmentPage() {
+  const tt = useT();
   const overdueOrSoon = equipment.filter((e) => daysUntil(e.calibrationDue) < 30).length;
   const active = equipment.filter((e) => e.status === "active").length;
 
@@ -21,15 +23,15 @@ export default function EquipmentPage() {
         description="Equipment register, calibration tracking, and integration endpoints."
         actions={
           <button className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Register equipment
+            <Plus className="w-4 h-4" /> {tt("Register equipment")}
           </button>
         }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Stat icon={Wrench} label="Total equipment" value={equipment.length} tone="brand" />
-        <Stat icon={CheckCircle2} label="Active & calibrated" value={active} tone="emerald" />
-        <Stat icon={AlertTriangle} label="Calibration due ≤ 30d" value={overdueOrSoon} tone="amber" />
+        <Stat icon={Wrench} label={tt("Total equipment")} value={equipment.length} tone="brand" />
+        <Stat icon={CheckCircle2} label={tt("Active & calibrated")} value={active} tone="emerald" />
+        <Stat icon={AlertTriangle} label={tt("Calibration due ≤ 30d")} value={overdueOrSoon} tone="amber" />
       </div>
 
       <div className="card overflow-hidden">
@@ -37,13 +39,13 @@ export default function EquipmentPage() {
           <table className="civix">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Manufacturer</th>
-                <th>Model</th>
-                <th>Serial</th>
-                <th>Cal. due</th>
-                <th>Status</th>
+                <th>{tt("Code")}</th>
+                <th>{tt("Name")}</th>
+                <th>{tt("Manufacturer")}</th>
+                <th>{tt("Model")}</th>
+                <th>{tt("Serial")}</th>
+                <th>{tt("Cal. due")}</th>
+                <th>{tt("Status")}</th>
               </tr>
             </thead>
             <tbody>
