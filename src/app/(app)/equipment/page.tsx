@@ -1,104 +1,18 @@
-"use client";
-
-import { Plus, Wrench, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { equipment } from "@/lib/mock-data";
-import { useT } from "@/lib/i18n";
-import { useLoc } from "@/lib/i18n-data";
-import { useApp } from "@/store/app-store";
-import { fmtAny } from "@/lib/utils";
-
-function daysUntil(date: string) {
-  const d = (new Date(date).getTime() - Date.now()) / 86400000;
-  return Math.round(d);
-}
+import { EquipmentStats } from "./_components/equipment-stats";
+import { EquipmentTable } from "./_components/equipment-table";
+import { NewEquipmentButton } from "./_components/new-equipment-button";
 
 export default function EquipmentPage() {
-  const tt = useT();
-  const loc = useLoc();
-  const lang = useApp((s) => s.lang);
-  const overdueOrSoon = equipment.filter((e) => daysUntil(e.calibrationDue) < 30).length;
-  const active = equipment.filter((e) => e.status === "active").length;
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Equipment"
         description="Equipment register, calibration tracking, and integration endpoints."
-        actions={
-          <button className="btn btn-primary">
-            <Plus className="w-4 h-4" /> {tt("Register equipment")}
-          </button>
-        }
+        actions={<NewEquipmentButton />}
       />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Stat icon={Wrench} label={tt("Total equipment")} value={equipment.length} tone="brand" />
-        <Stat icon={CheckCircle2} label={tt("Active & calibrated")} value={active} tone="emerald" />
-        <Stat icon={AlertTriangle} label={tt("Calibration due ≤ 30d")} value={overdueOrSoon} tone="amber" />
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="civix">
-            <thead>
-              <tr>
-                <th>{tt("Code")}</th>
-                <th>{tt("Name")}</th>
-                <th>{tt("Manufacturer")}</th>
-                <th>{tt("Model")}</th>
-                <th>{tt("Serial")}</th>
-                <th>{tt("Cal. due")}</th>
-                <th>{tt("Status")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {equipment.map((e) => {
-                const days = daysUntil(e.calibrationDue);
-                const tone = days < 0 ? "text-rose-600 font-medium" : days < 30 ? "text-amber-600 font-medium" : "";
-                return (
-                  <tr key={e.id}>
-                    <td className="font-mono text-xs">{fmtAny(e.code, lang)}</td>
-                    <td className="font-medium">{loc(e.name)}</td>
-                    <td>{e.manufacturer}</td>
-                    <td>{e.model}</td>
-                    <td className="font-mono text-xs">{fmtAny(e.serial, lang)}</td>
-                    <td className={tone}>
-                      {fmtAny(e.calibrationDue, lang)}
-                      <div className="text-xs">
-                        {days < 0
-                          ? `${fmtAny(Math.abs(days), lang)} ${tt("d overdue")}`
-                          : `${fmtAny(days, lang)} ${tt("d remaining")}`}
-                      </div>
-                    </td>
-                    <td><StatusBadge value={e.status} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ icon: Icon, label, value, tone }: { icon: typeof Wrench; label: string; value: number; tone: "brand" | "emerald" | "amber" }) {
-  const tones = {
-    brand: "bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300",
-    emerald: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-    amber: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  };
-  return (
-    <div className="card p-5 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl grid place-items-center ${tones[tone]}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <div className="text-xs uppercase tracking-wider text-[rgb(var(--muted))] font-medium">{label}</div>
-        <div className="text-2xl font-semibold mt-0.5">{value}</div>
-      </div>
+      <EquipmentStats />
+      <EquipmentTable />
     </div>
   );
 }
