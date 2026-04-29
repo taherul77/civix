@@ -5,7 +5,9 @@ import { useState, useMemo, type FormEvent } from "react";
 import { Plus, ListPlus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
-import { useData } from "@/store/data-store";
+import { useProjectsQuery, useSamplesQuery } from "@/server/queries";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
 import type { Test } from "@/lib/mock-data";
 
@@ -35,9 +37,8 @@ export function NewTestActions() {
 function QuickAddTest() {
   const tt = useT();
   const loc = useLoc();
-  const projects = useData((s) => s.projects);
-  const samples = useData((s) => s.samples);
-  const addTest = useData((s) => s.addTest);
+  const { data: projects = [] } = useProjectsQuery();
+  const { data: samples = [] } = useSamplesQuery();
   const [open, setOpen] = useState(false);
 
   const [code, setCode] = useState(autoTestCode());
@@ -58,7 +59,7 @@ function QuickAddTest() {
   const [resultUnit, setResultUnit] = useState("");
   const [resultLabel, setResultLabel] = useState("");
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     const useProject = projectId || projects[0]?.id || "";
     if (!code.trim() || !name.trim() || !useProject) return;
@@ -73,7 +74,7 @@ function QuickAddTest() {
           label: resultLabel.trim() || name.trim(),
         }
       : undefined;
-    addTest({
+    const created = await mutate(() => api.tests.create({
       code: code.trim(),
       name: name.trim(),
       category,
@@ -85,7 +86,8 @@ function QuickAddTest() {
       status,
       passFail,
       primaryResult,
-    });
+    }), `Test ${code.trim()} created`);
+    if (!created) return;
     setCode(autoTestCode()); setName(""); setStandard("");
     setTechnician(""); setStatus("draft"); setPassFail("pending");
     setResultValue(""); setResultUnit(""); setResultLabel("");

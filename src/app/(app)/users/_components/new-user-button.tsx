@@ -3,9 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
-import { useData, type User } from "@/store/data-store";
+import { type User } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
-import { useActor, useCan } from "@/lib/auth-context";
+import { useCan } from "@/lib/auth-context";
 
 const ROLES = [
   "Lab Engineer", "Project Manager", "Lab Technician", "Field Technician",
@@ -15,8 +17,6 @@ const DEPTS = ["Concrete", "Soil", "Aggregate", "Asphalt", "Steel", "Cement", "Q
 
 export function NewUserButton() {
   const tt = useT();
-  const addUser = useData((s) => s.addUser);
-  const actor = useActor();
   const canInvite = useCan("user:invite");
   const [open, setOpen] = useState(false);
   if (!canInvite) return null;
@@ -28,10 +28,14 @@ export function NewUserButton() {
   const [status, setStatus] = useState<User["status"]>("active");
   const [mfa, setMfa] = useState(true);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    addUser({ name: name.trim(), email: email.trim(), role, dept, status, mfa }, actor ?? undefined);
+    const created = await mutate(
+      () => api.users.invite({ name: name.trim(), email: email.trim(), role, dept, status, mfa }),
+      `Invited ${name.trim()}`
+    );
+    if (!created) return;
     setName(""); setEmail(""); setRole(ROLES[0]); setDept(DEPTS[0]);
     setStatus("active"); setMfa(true);
     setOpen(false);

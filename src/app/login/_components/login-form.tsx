@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FlaskConical, Lock, Mail, Building2, ShieldCheck } from "lucide-react";
-import { useApp } from "@/store/app-store";
-import { useData } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { ALL_ROLES } from "@/lib/rbac";
 
 const tenants = [
@@ -16,34 +16,19 @@ const tenants = [
 
 export function LoginForm() {
   const router = useRouter();
-  const signIn = useApp((s) => s.signIn);
-  const log = useData((s) => s.log);
   const [email, setEmail] = useState("eng.fahad@aramco-lab.sa");
   const [password, setPassword] = useState("demo");
   const [tenant, setTenant] = useState(tenants[0].id);
   const [role, setRole] = useState<string>("Lab Engineer");
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      const tenantName = tenants.find((t) => t.id === tenant)?.name ?? "Lab";
-      const name = email
-        .split("@")[0]
-        .split(".")
-        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-        .join(" ");
-      signIn({ email, name, role, tenant: tenantName });
-      log({
-        user: `${name} (${role})`,
-        email,
-        action: "login",
-        entity: "session",
-        entityId: email,
-      });
-      router.replace("/dashboard");
-    }, 400);
+    const tenantName = tenants.find((t) => t.id === tenant)?.name ?? "Lab";
+    const session = await mutate(() => api.auth.signIn({ email, password, role, tenant: tenantName }));
+    setLoading(false);
+    if (session) router.replace("/dashboard");
   };
 
   return (

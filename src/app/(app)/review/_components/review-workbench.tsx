@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, MessageSquare, FileSignature, Lock, AlertTriangl
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useTestsQuery } from "@/server/queries";
 import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { cn, fmtAny } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
@@ -35,25 +36,27 @@ export function ReviewWorkbench() {
 
   const reset = () => { setDecision(null); setComment(""); setSigned(false); setSignedSerial(null); };
 
-  const onMarkReviewed = () => {
-    if (!test || !actor) return;
-    reviewTest({ testId: test.id, actor, comment });
-    reset();
+  const onMarkReviewed = async () => {
+    if (!test) return;
+    const ok = await mutate(() => api.tests.review(test.id, { comment }), "Marked as reviewed");
+    if (ok !== null) reset();
   };
 
-  const onReject = () => {
-    if (!test || !actor) return;
-    rejectTest({ testId: test.id, actor, comment });
-    reset();
+  const onReject = async () => {
+    if (!test) return;
+    const ok = await mutate(() => api.tests.reject(test.id, { comment }), "Returned for correction");
+    if (ok !== null) reset();
   };
 
   const onApprove = () => setDecision("approve");
 
-  const onSign = () => {
-    if (!test || !actor) return;
+  const onSign = async () => {
+    if (!test) return;
     const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
-    signTest({ testId: test.id, actor, certificateSerial: serial });
-    approveTest({ testId: test.id, actor, comment });
+    const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }));
+    if (signOk === null) return;
+    const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved & locked");
+    if (apvOk === null) return;
     setSigned(true);
     setSignedSerial(serial);
   };

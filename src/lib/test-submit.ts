@@ -1,6 +1,7 @@
 "use client";
 
 import { useData } from "@/store/data-store";
+import { api } from "@/server/api";
 import { getActor } from "@/lib/auth-context";
 import type { Test } from "@/lib/mock-data";
 import type { TestContext } from "@/components/test-form/context-bar";
@@ -26,9 +27,16 @@ export function nextTestCode() {
   return `T-${yymm()}-${n}`;
 }
 
-export function submitTest(args: SubmitArgs): string {
+/**
+ * Persist a test record from a generic / bespoke test form.
+ *
+ * Always creates the record as `draft` so the audit trail captures
+ * `create → submit` as two distinct events. If the form's status is
+ * `submitted`, immediately calls `api.tests.submit()` for the second event.
+ */
+export async function submitTest(args: SubmitArgs): Promise<string> {
   const projects = useData.getState().projects;
-  const samples = useData.getState().samples;
+  const samples  = useData.getState().samples;
   const projectId = args.ctx.projectId || projects[0]?.id || "";
   const sampleId = args.ctx.sampleId
     || samples.find((s) => s.projectId === projectId)?.id
@@ -36,9 +44,8 @@ export function submitTest(args: SubmitArgs): string {
     || "";
 
   const newCode = nextTestCode();
-  const actor = getActor() ?? undefined;
-  // Always create as draft so the audit log records create→submit as two steps.
-  const id = useData.getState().addTest({
+  const actor = getActor();
+  const created = await api.tests.create({
     code: newCode,
     name: args.name,
     category: args.category,
@@ -50,10 +57,10 @@ export function submitTest(args: SubmitArgs): string {
     status: "draft",
     passFail: args.passFail,
     primaryResult: args.primaryResult,
-  }, actor);
+  });
 
   if (args.status === "submitted" && actor) {
-    useData.getState().submitTestForReview({ testId: id, actor });
+    await api.tests.submit(created.id);
   }
   return newCode;
 }

@@ -3,17 +3,16 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
-import { useData } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
-import { useActor, useCan } from "@/lib/auth-context";
+import { useCan } from "@/lib/auth-context";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const autoCode = () => `PRJ-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
 
 export function NewProjectButton() {
   const tt = useT();
-  const addProject = useData((s) => s.addProject);
-  const actor = useActor();
   const canCreate = useCan("project:create");
   const [open, setOpen] = useState(false);
   if (!canCreate) return null;
@@ -34,10 +33,10 @@ export function NewProjectButton() {
     setStatus("active"); setStartDate(today()); setEndDate(""); setContractValue("");
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !code.trim()) return;
-    addProject({
+    const created = await mutate(() => api.projects.create({
       code: code.trim(),
       name: name.trim(),
       client: client.trim(),
@@ -47,7 +46,8 @@ export function NewProjectButton() {
       startDate,
       endDate: endDate || startDate,
       contractValue: Number(contractValue) || 0,
-    }, actor ?? undefined);
+    }), `Project ${code.trim()} created`);
+    if (!created) return;
     reset();
     setOpen(false);
   };

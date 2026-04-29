@@ -4,7 +4,9 @@ import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
-import { useData } from "@/store/data-store";
+import { useProjectsQuery } from "@/server/queries";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
 import { useActor, useCan } from "@/lib/auth-context";
 import type { Sample } from "@/lib/mock-data";
@@ -23,8 +25,7 @@ function autoSampleCode() {
 export function NewSampleButton() {
   const tt = useT();
   const loc = useLoc();
-  const projects = useData((s) => s.projects);
-  const addSample = useData((s) => s.addSample);
+  const { data: projects = [] } = useProjectsQuery();
   const actor = useActor();
   const canCreate = useCan("sample:create");
   const [open, setOpen] = useState(false);
@@ -38,11 +39,11 @@ export function NewSampleButton() {
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<Sample["status"]>("pending");
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     const useProject = projectId || projects[0]?.id || "";
     if (!code.trim() || !useProject) return;
-    addSample({
+    const created = await mutate(() => api.samples.create({
       code: code.trim(),
       type,
       projectId: useProject,
@@ -50,7 +51,8 @@ export function NewSampleButton() {
       location: location.trim(),
       sampledBy: sampledBy.trim() || actor?.name || "—",
       status,
-    }, actor ?? undefined);
+    }), `Sample ${code.trim()} created`);
+    if (!created) return;
     setCode(autoSampleCode());
     setLocation(""); setSampledBy(""); setStatus("pending");
     setOpen(false);

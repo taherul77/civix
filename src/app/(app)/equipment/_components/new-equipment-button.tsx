@@ -3,9 +3,10 @@
 import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
-import { useData } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
-import { useActor, useCan } from "@/lib/auth-context";
+import { useCan } from "@/lib/auth-context";
 import type { Equipment } from "@/lib/mock-data";
 
 const autoCode = () => `EQ-NEW-${String(Math.floor(Math.random() * 90) + 10)}`;
@@ -13,8 +14,6 @@ const addDays = (d: number) => new Date(Date.now() + d * 86400000).toISOString()
 
 export function NewEquipmentButton() {
   const tt = useT();
-  const addEquipment = useData((s) => s.addEquipment);
-  const actor = useActor();
   const canCreate = useCan("equipment:create");
   const [open, setOpen] = useState(false);
   if (!canCreate) return null;
@@ -27,10 +26,10 @@ export function NewEquipmentButton() {
   const [calibrationDue, setCalibrationDue] = useState(addDays(180));
   const [status, setStatus] = useState<Equipment["status"]>("active");
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !name.trim()) return;
-    addEquipment({
+    const created = await mutate(() => api.equipment.create({
       code: code.trim(),
       name: name.trim(),
       manufacturer: manufacturer.trim(),
@@ -38,7 +37,8 @@ export function NewEquipmentButton() {
       serial: serial.trim(),
       calibrationDue,
       status,
-    }, actor ?? undefined);
+    }), `Equipment ${code.trim()} registered`);
+    if (!created) return;
     setCode(autoCode());
     setName(""); setManufacturer(""); setModel(""); setSerial("");
     setCalibrationDue(addDays(180)); setStatus("active");

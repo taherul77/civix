@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
 import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
@@ -47,7 +48,7 @@ export function TestDetailView({ id }: { id: string }) {
             <StatusBadge value={test.passFail} />
             {test.status === "draft" && (
               <button
-                onClick={() => api.tests.submit(test.id)}
+                onClick={() => mutate(() => api.tests.submit(test.id), "Submitted for review")}
                 disabled={!canSubmit}
                 className="btn btn-outline"
                 title={canSubmit ? "" : tt("Requires Lab Engineer / Technician role")}
@@ -57,7 +58,7 @@ export function TestDetailView({ id }: { id: string }) {
             )}
             {(test.status === "submitted" || test.status === "reviewed") && (
               <button
-                onClick={() => api.tests.reject(test.id)}
+                onClick={() => mutate(() => api.tests.reject(test.id), "Returned to draft")}
                 className="btn btn-outline"
               >
                 <RotateCcw className="w-4 h-4" /> {tt("Return to draft")}

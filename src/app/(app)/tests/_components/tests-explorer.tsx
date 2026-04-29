@@ -23,7 +23,8 @@ export function TestsExplorer() {
   const [q, setQ] = useState("");
 
   const { data: filtered = [] } = useTestsQuery({ status, category: cat, q });
-  const { data: total = 0 } = useTestsQuery({});
+  const { data: allTests = [] } = useTestsQuery({});
+  const total = allTests.length;
   const { data: samples = [] } = useSamplesQuery();
   const { data: projects = [] } = useProjectsQuery();
 

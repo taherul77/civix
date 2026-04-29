@@ -21,7 +21,8 @@
 import { useApp } from "@/store/app-store";
 import { useData } from "@/store/data-store";
 import { rolePermissions } from "@/lib/rbac";
-import { getActor } from "@/lib/auth-context";
+import { require as requirePerm, requireAuth } from "@/server/guard";
+import { errors } from "@/server/errors";
 import type {
   CreateEquipmentInput,
   CreateInvoiceInput,
@@ -84,6 +85,7 @@ export const auth = {
 
   async signIn(input: SignInInput): Promise<SessionRecord> {
     await tick();
+    if (!input.email || !input.password) throw errors.validation("Email and password required");
     const name = input.email
       .split("@")[0]
       .split(".")
@@ -129,6 +131,7 @@ export const auth = {
 export const projects = {
   async list(params: ListProjectsParams = {}): Promise<PagedResponse<ProjectRecord>> {
     await tick();
+    requireAuth();
     const all = useData.getState().projects;
     const items = all.filter((p) => {
       if (params.status && params.status !== "all" && p.status !== params.status) return false;
@@ -142,11 +145,13 @@ export const projects = {
   },
   async get(id: string): Promise<ProjectRecord | null> {
     await tick();
+    requireAuth();
     return useData.getState().projects.find((p) => p.id === id) ?? null;
   },
   async create(input: CreateProjectInput): Promise<ProjectRecord> {
     await tick();
-    const id = useData.getState().addProject(input, getActor() ?? undefined);
+    const actor = requirePerm("project:create");
+    const id = useData.getState().addProject(input, actor);
     return { ...input, id };
   },
 };
@@ -158,6 +163,7 @@ export const projects = {
 export const samples = {
   async list(params: ListSamplesParams = {}): Promise<PagedResponse<SampleRecord>> {
     await tick();
+    requireAuth();
     const all = useData.getState().samples;
     const items = all.filter((s) => {
       if (params.type && params.type !== "all" && s.type !== params.type) return false;
@@ -172,11 +178,13 @@ export const samples = {
   },
   async get(id: string): Promise<SampleRecord | null> {
     await tick();
+    requireAuth();
     return useData.getState().samples.find((s) => s.id === id) ?? null;
   },
   async create(input: CreateSampleInput): Promise<SampleRecord> {
     await tick();
-    const id = useData.getState().addSample(input, getActor() ?? undefined);
+    const actor = requirePerm("sample:create");
+    const id = useData.getState().addSample(input, actor);
     return { ...input, id };
   },
 };
@@ -188,6 +196,7 @@ export const samples = {
 export const tests = {
   async list(params: ListTestsParams = {}): Promise<PagedResponse<TestRecord>> {
     await tick();
+    requireAuth();
     const all = useData.getState().tests;
     const items = all.filter((t) => {
       if (params.status   && params.status   !== "all" && t.status   !== params.status)   return false;
@@ -205,48 +214,59 @@ export const tests = {
 
   async get(id: string): Promise<TestRecord | null> {
     await tick();
+    requireAuth();
     return useData.getState().tests.find((t) => t.id === id) ?? null;
   },
 
   async create(input: CreateTestInput): Promise<TestRecord> {
     await tick();
-    const id = useData.getState().addTest(input, getActor() ?? undefined);
+    const actor = requirePerm("test:create");
+    const id = useData.getState().addTest(input, actor);
     return { ...input, id };
   },
 
   async submit(id: string): Promise<void> {
     await tick();
-    const a = getActor();
-    if (!a) throw new Error("Not authenticated");
-    useData.getState().submitTestForReview({ testId: id, actor: a });
+    const actor = requirePerm("test:submit");
+    const t = useData.getState().tests.find((x) => x.id === id);
+    if (!t) throw errors.notFound("Test", id);
+    if (t.status !== "draft") throw errors.conflict(`Test ${id} cannot be submitted from status "${t.status}"`);
+    useData.getState().submitTestForReview({ testId: id, actor });
   },
 
   async review(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    const a = getActor();
-    if (!a) throw new Error("Not authenticated");
-    useData.getState().reviewTest({ testId: id, actor: a, comment: opts.comment });
+    const actor = requirePerm("test:review");
+    const t = useData.getState().tests.find((x) => x.id === id);
+    if (!t) throw errors.notFound("Test", id);
+    if (t.status !== "submitted") throw errors.conflict(`Test ${id} cannot be reviewed from status "${t.status}"`);
+    useData.getState().reviewTest({ testId: id, actor, comment: opts.comment });
   },
 
   async approve(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    const a = getActor();
-    if (!a) throw new Error("Not authenticated");
-    useData.getState().approveTest({ testId: id, actor: a, comment: opts.comment });
+    const actor = requirePerm("test:approve");
+    const t = useData.getState().tests.find((x) => x.id === id);
+    if (!t) throw errors.notFound("Test", id);
+    if (t.status === "approved") throw errors.conflict(`Test ${id} is already approved.`);
+    useData.getState().approveTest({ testId: id, actor, comment: opts.comment });
   },
 
   async sign(id: string, input: SignInput): Promise<void> {
     await tick();
-    const a = getActor();
-    if (!a) throw new Error("Not authenticated");
-    useData.getState().signTest({ testId: id, actor: a, certificateSerial: input.certificateSerial });
+    const actor = requirePerm("test:sign");
+    const t = useData.getState().tests.find((x) => x.id === id);
+    if (!t) throw errors.notFound("Test", id);
+    if (!input.certificateSerial) throw errors.validation("Certificate serial required for signing");
+    useData.getState().signTest({ testId: id, actor, certificateSerial: input.certificateSerial });
   },
 
   async reject(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    const a = getActor();
-    if (!a) throw new Error("Not authenticated");
-    useData.getState().rejectTest({ testId: id, actor: a, comment: opts.comment });
+    const actor = requirePerm("test:review");
+    const t = useData.getState().tests.find((x) => x.id === id);
+    if (!t) throw errors.notFound("Test", id);
+    useData.getState().rejectTest({ testId: id, actor, comment: opts.comment });
   },
 };
 
@@ -257,12 +277,14 @@ export const tests = {
 export const equipment = {
   async list(): Promise<PagedResponse<EquipmentRecord>> {
     await tick();
+    requireAuth();
     const items = useData.getState().equipment;
     return { items, total: items.length };
   },
   async create(input: CreateEquipmentInput): Promise<EquipmentRecord> {
     await tick();
-    const id = useData.getState().addEquipment(input, getActor() ?? undefined);
+    const actor = requirePerm("equipment:create");
+    const id = useData.getState().addEquipment(input, actor);
     return { ...input, id };
   },
 };
@@ -274,12 +296,14 @@ export const equipment = {
 export const users = {
   async list(): Promise<PagedResponse<UserRecord>> {
     await tick();
+    requireAuth();
     const items = useData.getState().users;
     return { items, total: items.length };
   },
   async invite(input: InviteUserInput): Promise<UserRecord> {
     await tick();
-    const id = useData.getState().addUser(input, getActor() ?? undefined);
+    const actor = requirePerm("user:invite");
+    const id = useData.getState().addUser(input, actor);
     return { ...input, id };
   },
 };
@@ -291,12 +315,14 @@ export const users = {
 export const invoices = {
   async list(): Promise<PagedResponse<InvoiceRecord>> {
     await tick();
+    requireAuth();
     const items = useData.getState().invoices;
     return { items, total: items.length };
   },
   async create(input: CreateInvoiceInput): Promise<InvoiceRecord> {
     await tick();
-    useData.getState().addInvoice(input, getActor() ?? undefined);
+    const actor = requirePerm("billing:create");
+    useData.getState().addInvoice(input, actor);
     return input;
   },
 };

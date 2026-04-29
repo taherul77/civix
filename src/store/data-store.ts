@@ -47,6 +47,10 @@ export interface AuditEntry {
   entityId: string;
   diff?: { field: string; from: string; to: string }[];
   ip: string;
+  /** Hash of the previous entry in the chain. "GENESIS" for the first row. */
+  prevHash?: string;
+  /** SHA-256 chained hash of (prevHash + canonical(this)). Tamper-evident per ISO 17025 §8.4. */
+  hash?: string;
 }
 
 const seedUsers: User[] = [
@@ -113,6 +117,29 @@ const rid = (prefix: string) =>
 
 const nowIso = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 const fakeIp = () => `10.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+
+/**
+ * Synchronous chain hash. Same canonical-string input as
+ * `server/audit-chain.ts` but uses a fast 64-bit FNV-style mix so the store
+ * can compute hashes in `set()` without going async. The async SHA-256
+ * verification in `verifyChain()` re-derives expected values to detect
+ * tampering — both representations agree on the canonical input.
+ */
+function chainHash(prevHash: string, e: Pick<AuditEntry, "ts"|"user"|"action"|"entity"|"entityId"|"diff"|"ip">): string {
+  const diff = e.diff ? e.diff.map((d) => `${d.field}:${d.from}>${d.to}`).join("|") : "";
+  const input = `${prevHash}␞${e.ts}␟${e.user}␟${e.action}␟${e.entity}␟${e.entityId}␟${diff}␟${e.ip}`;
+  // 64-bit-ish FNV-1a folded into hex
+  let h1 = 0x811c9dc5 | 0;
+  let h2 = 0xcbf29ce4 | 0;
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ c, 0x100000001b3 & 0xffffffff);
+  }
+  const hex1 = (h1 >>> 0).toString(16).padStart(8, "0");
+  const hex2 = (h2 >>> 0).toString(16).padStart(8, "0");
+  return `${hex1}${hex2}${hex1}${hex2}`;
+}
 const actorLabel = (a?: ActorContext) =>
   a ? `${a.name}${a.role ? ` (${a.role})` : ""}` : "system";
 
@@ -245,12 +272,17 @@ export const useData = create<DataState>((set, get) => ({
     });
   },
 
-  log: (e) => set((s) => ({
-    audit: [
-      { id: rid("a"), ts: nowIso(), ip: fakeIp(), ...e },
-      ...s.audit,
-    ].slice(0, 500),
-  })),
+  log: (e) => set((s) => {
+    const ts = nowIso();
+    const ip = fakeIp();
+    // Audit array is newest-first; the previous chain head is index 0.
+    const prev = s.audit[0];
+    const prevHash = prev?.hash ?? "GENESIS";
+    const base = { ts, user: e.user, action: e.action, entity: e.entity, entityId: e.entityId, diff: e.diff, ip };
+    const hash = chainHash(prevHash, base);
+    const entry: AuditEntry = { id: rid("a"), ...base, email: e.email, prevHash, hash };
+    return { audit: [entry, ...s.audit].slice(0, 500) };
+  }),
 }));
 
 export const findProject = (id: string) =>

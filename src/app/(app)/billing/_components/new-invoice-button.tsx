@@ -3,17 +3,17 @@
 import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
-import { useData, type Invoice } from "@/store/data-store";
+import { type Invoice } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
-import { useActor, useCan } from "@/lib/auth-context";
+import { useCan } from "@/lib/auth-context";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const autoId = () => `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
 
 export function NewInvoiceButton() {
   const tt = useT();
-  const addInvoice = useData((s) => s.addInvoice);
-  const actor = useActor();
   const canCreate = useCan("billing:create");
   const [open, setOpen] = useState(false);
   if (!canCreate) return null;
@@ -24,11 +24,11 @@ export function NewInvoiceButton() {
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<Invoice["status"]>("draft");
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!id.trim() || !client.trim()) return;
     const amt = Number(amount) || 0;
-    addInvoice({
+    const created = await mutate(() => api.invoices.create({
       id: id.trim(),
       client: client.trim(),
       amount: amt,
@@ -36,7 +36,8 @@ export function NewInvoiceButton() {
       status,
       date,
       zatca: status === "draft" ? "—" : `ZX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-    }, actor ?? undefined);
+    }), `Invoice ${id.trim()} created`);
+    if (!created) return;
     setId(autoId()); setClient(""); setAmount(""); setStatus("draft");
     setOpen(false);
   };
