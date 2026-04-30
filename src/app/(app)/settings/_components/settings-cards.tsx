@@ -5,8 +5,9 @@ import { Building2, Globe, Palette, Shield, Database } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export function SettingsCards() {
-  const { lang, theme, setLang, setTheme, user } = useApp();
+  const { lang, theme, setLang, setTheme, user, mfa } = useApp();
   const tt = useT();
+  const mfaEnrolled = !!(user && mfa[user.email]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -47,7 +48,14 @@ export function SettingsCards() {
       </Card>
 
       <Card icon={<Shield className="w-4 h-4" />} title={tt("Security")}>
-        <Row label={tt("MFA")} value={<span className="badge badge-pass">{tt("Enabled (TOTP)")}</span>} />
+        <Row
+          label={tt("MFA")}
+          value={
+            mfaEnrolled
+              ? <span className="badge badge-pass">{tt("Enabled (TOTP)")}</span>
+              : <span className="badge badge-warn">Disabled</span>
+          }
+        />
         <Row label={tt("Session timeout")} value={tt("30 minutes")} />
         <Row label={tt("Audit log retention")} value={tt("ISO 17025: 7 years")} />
         <Row label={tt("SAML SSO")} value={<span className="badge badge-info">{tt("Available")}</span>} />

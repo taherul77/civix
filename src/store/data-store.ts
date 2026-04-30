@@ -22,14 +22,70 @@ export interface User {
   mfa: boolean;
 }
 
+export interface InvoiceLineItem {
+  description: string;
+  qty: number;
+  unitPriceSar: number;
+  vatRate: number;       // percent (15 default)
+}
+
+export interface InvoiceZatca {
+  uuid: string;
+  invoiceHash: string;       // base64 SHA-256 of invoice canonical
+  signature: string;         // base64 ECDSA seller signature
+  publicKeySpki: string;     // base64 SPKI of CSID public key
+  stamp: string;             // base64 ZATCA stamp
+  qrBase64: string;          // TLV QR payload (base64)
+  clearedAt: string;         // ISO
+  csidSerial: string;
+}
+
 export interface Invoice {
   id: string;
   client: string;
-  amount: number;
-  vat: number;
+  amount: number;            // pre-VAT SAR
+  vat: number;               // SAR
   status: "draft" | "sent" | "paid";
   date: string;
+  /** Legacy short-form ZATCA UUID badge (kept for table column). */
   zatca: string;
+  lineItems?: InvoiceLineItem[];
+  /** Full ZATCA Phase 2 clearance envelope — present once cleared. */
+  zatcaPayload?: InvoiceZatca;
+}
+
+export interface CsidStored {
+  serial: string;
+  status: "active" | "expired";
+  issuedAt: string;
+  expiresAt: string;
+  publicKeySpkiB64: string;
+  privateKeyJwk: JsonWebKey;
+  lastRotatedAt: string;
+}
+
+export interface EquipmentReadingRecord {
+  id: string;
+  equipmentId: string;
+  capturedAt: string;
+  vendor: string;
+  testType?: string;
+  finalResult?: { value: number; unit: string; label: string };
+  samples: { t: number; value: number; unit: string; parameter?: string }[];
+  environmental?: { temperatureC?: number; humidityPercent?: number };
+  calibrationStatus: "valid" | "warning" | "expired";
+  rawDataRef?: string;
+  note?: string;
+  /** True once a test record has consumed this reading. */
+  consumed?: boolean;
+}
+
+export interface EquipmentConnection {
+  vendor: string;
+  endpoint?: string;
+  apiKey?: string;
+  pollIntervalSeconds?: number;
+  lastPolledAt?: string;
 }
 
 export type AuditAction =
@@ -89,6 +145,16 @@ interface DataState {
   users: User[];
   invoices: Invoice[];
   audit: AuditEntry[];
+  equipmentReadings: EquipmentReadingRecord[];
+  equipmentConnections: Record<string, EquipmentConnection>;
+  addEquipmentReading: (r: EquipmentReadingRecord) => void;
+  consumeEquipmentReading: (id: string) => void;
+  setEquipmentConnection: (equipmentId: string, conn: EquipmentConnection | null) => void;
+
+  /** Active CSID for this tenant — null until first issued. */
+  csid: CsidStored | null;
+  setCsid: (c: CsidStored | null) => void;
+  updateInvoice: (id: string, patch: Partial<Invoice>) => void;
 
   // creates
   addProject: (p: Omit<Project, "id">, actor?: ActorContext) => string;
@@ -151,6 +217,23 @@ export const useData = create<DataState>((set, get) => ({
   users: [...seedUsers],
   invoices: [...seedInvoices],
   audit: [],
+  equipmentReadings: [],
+  equipmentConnections: {},
+  csid: null,
+
+  addEquipmentReading: (r) => set((s) => ({ equipmentReadings: [r, ...s.equipmentReadings].slice(0, 200) })),
+  consumeEquipmentReading: (id) =>
+    set((s) => ({ equipmentReadings: s.equipmentReadings.map((x) => x.id === id ? { ...x, consumed: true } : x) })),
+  setEquipmentConnection: (equipmentId, conn) =>
+    set((s) => {
+      const next = { ...s.equipmentConnections };
+      if (conn) next[equipmentId] = conn;
+      else delete next[equipmentId];
+      return { equipmentConnections: next };
+    }),
+  setCsid: (c) => set({ csid: c }),
+  updateInvoice: (id, patch) =>
+    set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, ...patch } : i)) })),
 
   addProject: (p, actor) => {
     const id = rid("p");

@@ -30,6 +30,16 @@ export interface SessionRecord {
   permissions: Permission[];
 }
 
+export type MfaSignInResult =
+  | { kind: "session";       session: SessionRecord }
+  | { kind: "mfa-required";  email: string; name: string };
+
+export interface MfaEnrolmentInit {
+  secret: string;
+  otpauthUri: string;
+  recoveryCodes: string[];
+}
+
 // ---------------------------------------------------------------------------
 // List query params (mirrors how a real REST API would filter server-side)
 // ---------------------------------------------------------------------------
@@ -82,6 +92,23 @@ export interface SignInInput {
   role: string;
 }
 
+export interface MfaVerifyInput {
+  code: string;
+}
+
+export interface MfaRecoveryInput {
+  recoveryCode: string;
+}
+
+export interface MfaEnrolVerifyInput {
+  code: string;
+}
+
+export interface ReportGenerateInput {
+  testId: string;
+  format: "pdf" | "docx" | "xlsx";
+}
+
 export interface WorkflowComment { comment?: string }
 
 export interface SignInput { certificateSerial: string }
@@ -89,6 +116,35 @@ export interface SignInput { certificateSerial: string }
 // ---------------------------------------------------------------------------
 // Dashboard aggregate (KPI tiles + charts data)
 // ---------------------------------------------------------------------------
+
+export interface ReportContext {
+  test: TestRecord;
+  sample: SampleRecord | null;
+  project: ProjectRecord | null;
+  reportNumber: string;
+  generatedAt: string | null;
+  signedBy: string | null;
+  signatureSerial: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  conformity: "conforms" | "does_not_conform" | "pending";
+}
+
+export interface VerifyResult {
+  reportNumber: string;
+  found: boolean;
+  testCode?: string;
+  standard?: string;
+  conformity?: "conforms" | "does_not_conform" | "pending";
+  signedBy?: string | null;
+  signatureSerial?: string | null;
+  signedAt?: string | null;
+  approvedAt?: string | null;
+  chainOk?: boolean;
+  brokenAt?: string | null;
+}
 
 export interface DashboardStats {
   testsToday: number;

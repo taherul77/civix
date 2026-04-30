@@ -3,10 +3,12 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useUsersQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
+import { useApp } from "@/store/app-store";
 
 export function UsersTable() {
   const tt = useT();
   const { data: users = [] } = useUsersQuery();
+  const mfa = useApp((s) => s.mfa);
 
   return (
     <div className="card overflow-hidden">
@@ -30,7 +32,7 @@ export function UsersTable() {
                 <td>{u.role}</td>
                 <td>{u.dept}</td>
                 <td>
-                  {u.mfa
+                  {(u.mfa || mfa[u.email])
                     ? <span className="badge badge-pass">Enabled</span>
                     : <span className="badge badge-warn">Disabled</span>}
                 </td>

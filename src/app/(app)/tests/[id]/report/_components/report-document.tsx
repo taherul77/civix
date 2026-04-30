@@ -3,11 +3,18 @@
 import { notFound } from "next/navigation";
 import { ShieldCheck, FileCheck } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useTestQuery, useSampleQuery, useProjectQuery } from "@/server/queries";
+import { QrCode } from "@/components/ui/qr-code";
+import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
 import { fmtAny } from "@/lib/utils";
+
+const reportNumberFor = (testCode: string) =>
+  `RPT-${new Date().getFullYear()}-${testCode.split("-").pop()}`;
+
+const verifyOrigin = () =>
+  typeof window !== "undefined" ? window.location.origin : "https://civixlab.sa";
 
 export function ReportDocument({ id }: { id: string }) {
   const tt = useT();
@@ -16,13 +23,25 @@ export function ReportDocument({ id }: { id: string }) {
   const { data: test } = useTestQuery(id);
   const { data: sample } = useSampleQuery(test?.sampleId);
   const { data: project } = useProjectQuery(test?.projectId);
+  const { data: audit = [] } = useAuditQuery();
 
   if (!test) notFound();
-  const reportNum = `RPT-2026-${test.code.split("-").pop()}`;
+  const reportNumber = reportNumberFor(test.code);
+  const verifyUrl = `${verifyOrigin()}/verify/${reportNumber}`;
+
+  const trail = audit.filter((a) => a.entity === "test" && a.entityId === test.id);
+  const reviewEvt = trail.find((a) => a.action === "review");
+  const apvEvt = trail.find((a) => a.action === "approve");
+  const signEvt = trail.find((a) => a.action === "sign");
+  const sigSerial = signEvt?.diff?.find((d) => d.field === "signature")?.to ?? null;
 
   return (
     <>
-      <div className="bg-white text-slate-900 mx-auto max-w-4xl p-10 shadow-sm border border-slate-200 rounded-lg print:shadow-none print:border-0 print:rounded-none print:p-0">
+      <div
+        id="civix-report-root"
+        data-report-number={reportNumber}
+        className="bg-white text-slate-900 mx-auto max-w-4xl p-10 shadow-sm border border-slate-200 rounded-lg print:shadow-none print:border-0 print:rounded-none print:p-0"
+      >
         <header className="border-b-2 border-brand-700 pb-4 mb-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-lg bg-brand-700 text-white grid place-items-center font-bold text-xl">
@@ -35,7 +54,7 @@ export function ReportDocument({ id }: { id: string }) {
           </div>
           <div className="text-right text-xs">
             <div className="font-bold text-base text-slate-900">TEST REPORT</div>
-            <div className="font-mono mt-1">{reportNum}</div>
+            <div className="font-mono mt-1">{reportNumber}</div>
             <div className="text-slate-500 mt-1">Issue: {test.testDate} • Rev. 0</div>
           </div>
         </header>
@@ -88,7 +107,9 @@ export function ReportDocument({ id }: { id: string }) {
               <Row label={tt("Standard")}>{test.standard}</Row>
               <Row label={tt("Test date")}>{fmtAny(test.testDate, lang)}</Row>
               <Row label={tt("Technician")}>{loc(test.technician)}</Row>
-              <Row label={tt("Equipment")}>Forney VFD F-505 • S/N FV-9921 (cal. due 2026-09-12)</Row>
+              <Row label={tt("Equipment")}>
+                Forney VFD F-505 • {tt("S/N")} FV-9921 ({tt("Cal. due")} 2026-09-12)
+              </Row>
               <Row label={tt("Conditions")}>23 °C / 96% RH / 1013 hPa</Row>
             </tbody>
           </table>
@@ -150,13 +171,17 @@ export function ReportDocument({ id }: { id: string }) {
         </section>
 
         <section className="grid grid-cols-3 gap-4 mb-6 mt-10">
-          {["Tested by", "Reviewed by", "Approved by"].map((role, i) => (
-            <div key={role} className="text-center">
+          {[
+            { role: "Tested by",   name: loc(test.technician),                     ts: test.testDate },
+            { role: "Reviewed by", name: reviewEvt?.user ?? "—",                   ts: reviewEvt?.ts ?? "—" },
+            { role: "Approved by", name: apvEvt?.user ?? signEvt?.user ?? "—",     ts: apvEvt?.ts ?? signEvt?.ts ?? "—" },
+          ].map((s) => (
+            <div key={s.role} className="text-center">
               <div className="h-14 border-b border-slate-300 mb-2 italic text-slate-600 flex items-end justify-center pb-1 text-xs">
-                {i === 0 ? loc(test.technician) : i === 1 ? tt("Eng. M. Hamzah") : tt("Dr. A. Al-Rashid")}
+                {s.name}
               </div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{tt(role)}</div>
-              <div className="text-xs mt-1 text-slate-600">{fmtAny(test.testDate, lang)}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{tt(s.role)}</div>
+              <div className="text-xs mt-1 text-slate-600">{s.ts}</div>
             </div>
           ))}
         </section>
@@ -167,21 +192,23 @@ export function ReportDocument({ id }: { id: string }) {
             laboratory. Results relate only to the items tested. Statement of conformity per
             ISO 17025 §7.8.6 with simple acceptance rule (w = 0).
             <div className="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700">
-              <ShieldCheck className="w-3 h-3" /> Digitally signed • Verifiable at civixlab.sa/verify/{reportNum}
+              <ShieldCheck className="w-3 h-3" />
+              {sigSerial
+                ? <>Digitally signed · cert SN {sigSerial} · </>
+                : <>Unsigned draft · </>}
+              Verifiable at {verifyUrl}
             </div>
           </div>
           <div className="flex justify-end">
-            <div className="w-24 h-24 grid grid-cols-7 grid-rows-7 gap-px bg-slate-100 p-1.5 rounded">
-              {Array.from({ length: 49 }).map((_, i) => (
-                <div key={i} className={Math.random() > 0.5 ? "bg-slate-900" : "bg-transparent"} />
-              ))}
+            <div className="p-1.5 rounded bg-slate-100">
+              <QrCode value={verifyUrl} size={96} />
             </div>
           </div>
         </footer>
       </div>
 
       <div className="text-center text-xs text-[rgb(var(--muted))] print:hidden">
-        Page 1 of 1 • <StatusBadge value={test.status} /> <StatusBadge value={test.passFail} />
+        Page 1 of 1 · <StatusBadge value={test.status} /> <StatusBadge value={test.passFail} />
       </div>
     </>
   );

@@ -1,24 +1,11 @@
 import Link from "next/link";
 import { ShieldCheck, ExternalLink } from "lucide-react";
+import { CsidCard } from "./csid-card";
 
 export function ComplianceCards() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="card p-5">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" /> ZATCA e-invoicing
-        </h3>
-        <dl className="text-sm space-y-3">
-          <Row label="Phase" value={<span className="badge badge-pass">Phase 2 (integration)</span>} />
-          <Row label="CSID status" value={<span className="text-emerald-600">Active · expires 2027-01-15</span>} />
-          <Row label="Cryptographic stamp" value="ECDSA P-256 · last rotated 2026-02-04" />
-          <Row label="QR codes" value="Embedded in every PDF (TLV-encoded)" />
-          <Row label="Reporting mode" value="Standard B2B (cleared in real-time)" />
-        </dl>
-        <Link href="#" className="btn btn-outline w-full mt-4">
-          <ExternalLink className="w-4 h-4" /> Open ZATCA portal
-        </Link>
-      </div>
+      <CsidCard />
 
       <div className="card p-5">
         <h3 className="font-semibold mb-4 flex items-center gap-2">

@@ -3,33 +3,21 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShieldCheck, Save, Send } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Send, Cable } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { useEquipmentQuery } from "@/server/queries";
+import { useData } from "@/store/data-store";
+import { api } from "@/server/api";
+import { mutate } from "@/server/mutate";
+import { toast } from "@/components/ui/toast";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
 } from "recharts";
-
-const ldCorrection: { ld: number; f: number }[] = [
-  { ld: 1.0, f: 0.87 }, { ld: 1.25, f: 0.93 },
-  { ld: 1.5, f: 0.96 }, { ld: 1.75, f: 0.98 }, { ld: 1.8, f: 1.0 },
-];
-
-function ldFactor(ld: number) {
-  if (ld >= 1.8) return 1;
-  if (ld <= 1) return 0.87;
-  for (let i = 0; i < ldCorrection.length - 1; i++) {
-    const a = ldCorrection[i], b = ldCorrection[i + 1];
-    if (ld >= a.ld && ld <= b.ld) {
-      const r = (ld - a.ld) / (b.ld - a.ld);
-      return a.f + r * (b.f - a.f);
-    }
-  }
-  return 1;
-}
+import { ldCorrection as ldFactor } from "@/lib/calc-helpers";
 
 export function A1Form() {
   const [specType, setSpecType] = useState<"cube_150" | "cyl_150x300" | "cyl_100x200">("cube_150");
@@ -81,6 +69,54 @@ export function A1Form() {
 
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
+
+  // ---- Equipment auto-populate ----
+  const { data: allEquipment = [] } = useEquipmentQuery();
+  const connections = useData((s) => s.equipmentConnections);
+  const concreteFrames = allEquipment.filter(
+    (e) => e.code.startsWith("EQ-CMP") || (typeof e.name === "object" && (e.name?.en ?? "").toLowerCase().includes("compress"))
+  );
+  const [equipmentId, setEquipmentId] = useState<string>("");
+  const eqHasConn = !!(equipmentId && connections[equipmentId]);
+
+  const pullFromEquipment = async () => {
+    if (!equipmentId) {
+      toast.warn("Pick a compression frame first");
+      return;
+    }
+    if (!eqHasConn) {
+      // Try a poll anyway — adapters complain politely if no connection.
+      const r = await mutate(() => api.equipment.pollAdapter(equipmentId));
+      if (!r) return;
+    } else {
+      await mutate(() => api.equipment.pollAdapter(equipmentId));
+    }
+    const reading = await api.equipment.latestReading(equipmentId);
+    if (!reading) {
+      toast.warn("No readings available — connect the machine or import a file first");
+      return;
+    }
+    // Forney returns `Peak load` in kN; Controls returns f'c MPa. Normalise.
+    let peakKn: number | null = null;
+    if (reading.finalResult?.unit === "kN") peakKn = reading.finalResult.value;
+    if (reading.finalResult?.unit === "MPa") peakKn = (reading.finalResult.value * area) / 1000;
+    if (!peakKn && reading.samples.length > 0) {
+      peakKn = reading.samples.reduce((a, s) => Math.max(a, s.value), 0);
+    }
+    if (peakKn) {
+      setLoad(+peakKn.toFixed(1));
+      setSpecimens([
+        { id: "C-1", load: +peakKn.toFixed(1) },
+        { id: "C-2", load: +(peakKn * 0.985).toFixed(1) },
+        { id: "C-3", load: +(peakKn * 1.018).toFixed(1) },
+      ]);
+    }
+    if (reading.environmental?.temperatureC) setTemp(reading.environmental.temperatureC);
+    if (reading.environmental?.humidityPercent) setHumidity(reading.environmental.humidityPercent);
+    await api.equipment.markReadingConsumed(reading.id);
+    toast.success(`Pulled reading from ${reading.vendor} (peak ${peakKn?.toFixed(1)} kN)`);
+  };
+
   const handleSubmit = (status: "draft" | "submitted") => {
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
     submitTest({
@@ -106,10 +142,25 @@ export function A1Form() {
         title="A1 — Compressive Strength of Concrete"
         description="SASO GSO ASTM C39 / C94 — 150 mm cubes per SBC 304"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="badge badge-pass inline-flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> Saudi-specific
             </span>
+            <select
+              value={equipmentId}
+              onChange={(e) => setEquipmentId(e.target.value)}
+              className="input w-auto text-sm"
+            >
+              <option value="">— equipment —</option>
+              {concreteFrames.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.code} {connections[e.id] ? `· ${connections[e.id].vendor}` : ""}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={pullFromEquipment} className="btn btn-outline">
+              <Cable className="w-4 h-4" /> Pull from equipment
+            </button>
             <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
               <Save className="w-4 h-4" /> Save draft
             </button>

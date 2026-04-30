@@ -51,6 +51,8 @@ export interface TestSchema {
 
 const num = (v: Record<string, number | string>, k: string) => Number(v[k] ?? 0);
 
+import { uscsClassify, casagrandePc, mohrCoulomb, carbonEquivalent, finenessModulus } from "@/lib/calc-helpers";
+
 export const schemas: Record<string, TestSchema> = {
   // ---------- CONCRETE ----------
   A2: {
@@ -145,24 +147,35 @@ export const schemas: Record<string, TestSchema> = {
 
   A7: {
     code: "A7", name: "Concrete Maturity Method", standard: "ASTM C1074", category: "concrete",
-    description: "In-place strength via temperature-time factor.",
+    description: "In-place strength via Nurse-Saul TTF and Arrhenius equivalent age.",
     sections: [{ title: "Inputs", fields: [
       { key: "datum_t", label: "Datum temperature", unit: "°C", type: "number", default: -10 },
       { key: "avg_t", label: "Average concrete temp", unit: "°C", type: "number", default: 35 },
       { key: "time_h", label: "Elapsed time", unit: "h", type: "number", default: 168 },
+      { key: "ref_t", label: "Reference temperature (Tref)", unit: "°C", type: "number", default: 20 },
+      { key: "Ea", label: "Activation energy (Ea)", unit: "kJ/mol", type: "number", default: 40 },
       { key: "design_fc", label: "Design f'c", unit: "MPa", type: "number", default: 30 },
       { key: "stripping_pct", label: "Stripping % of f'c", unit: "%", type: "number", default: 70 },
     ]}],
     results: [
-      { label: "TTF (Nurse-Saul)", unit: "°C·h", decimals: 0, compute: (v) => (num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h") },
+      { label: "TTF (Nurse-Saul)", unit: "°C·h", decimals: 0, compute: (v) =>
+        Math.max(0, num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h") },
+      { label: "Equivalent age (Arrhenius)", unit: "h", decimals: 1, compute: (v) => {
+        const R = 8.314e-3; // kJ/(mol·K)
+        const factor = Math.exp(
+          (-num(v, "Ea") / R) *
+            (1 / (num(v, "avg_t") + 273.15) - 1 / (num(v, "ref_t") + 273.15))
+        );
+        return num(v, "time_h") * factor;
+      }},
       { label: "Estimated strength", unit: "MPa", decimals: 1, compute: (v) => {
-        const ttf = (num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h");
+        const ttf = Math.max(0, num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h");
         const pct = Math.min(100, 18 * Math.log10(Math.max(ttf, 1)) + 5);
         return (pct / 100) * num(v, "design_fc");
       }},
     ],
     passRules: [{ label: "Strength ≥ stripping requirement", ok: (v) => {
-      const ttf = (num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h");
+      const ttf = Math.max(0, num(v, "avg_t") - num(v, "datum_t")) * num(v, "time_h");
       const pct = Math.min(100, 18 * Math.log10(Math.max(ttf, 1)) + 5);
       return pct >= num(v, "stripping_pct");
     }}],
@@ -285,20 +298,28 @@ export const schemas: Record<string, TestSchema> = {
 
   A14: {
     code: "A14", name: "Carbonation Depth", standard: "SBC 304", category: "concrete", saudiSpecific: true,
-    description: "Depth via phenolphthalein indicator.",
+    description: "Depth via phenolphthalein indicator. Predicts cover required for design life.",
     sections: [{ title: "Measurements", fields: [
       { key: "age", label: "Age", unit: "days", type: "number", default: 365 },
       { key: "depth_avg", label: "Average depth", unit: "mm", type: "number", default: 6 },
       { key: "depth_max", label: "Maximum depth", unit: "mm", type: "number", default: 9 },
       { key: "cover", label: "Specified concrete cover", unit: "mm", type: "number", default: 40 },
+      { key: "design_life_yr", label: "Design life", unit: "yr", type: "number", default: 50 },
+      { key: "safety_factor", label: "Safety factor", type: "number", default: 1.5 },
     ]}],
     results: [
       { label: "Carbonation rate", unit: "mm/√yr", decimals: 2, compute: (v) =>
         num(v, "depth_avg") / Math.sqrt(num(v, "age") / 365.25) },
-      { label: "Predicted at 50 yr", unit: "mm", decimals: 1, compute: (v) =>
-        (num(v, "depth_avg") / Math.sqrt(num(v, "age") / 365.25)) * Math.sqrt(50) },
+      { label: "Predicted at design life", unit: "mm", decimals: 1, compute: (v) =>
+        (num(v, "depth_avg") / Math.sqrt(num(v, "age") / 365.25)) * Math.sqrt(num(v, "design_life_yr")) },
+      { label: "Required cover (with SF)", unit: "mm", decimals: 1, compute: (v) =>
+        (num(v, "depth_avg") / Math.sqrt(num(v, "age") / 365.25)) * Math.sqrt(num(v, "design_life_yr")) * num(v, "safety_factor") },
     ],
-    passRules: [{ label: "Carbonation has not reached steel", ok: (v) => num(v, "depth_max") < num(v, "cover") }],
+    passRules: [
+      { label: "Carbonation has not reached steel", ok: (v) => num(v, "depth_max") < num(v, "cover") },
+      { label: "Cover ≥ predicted × SF for design life", ok: (v) =>
+        num(v, "cover") >= (num(v, "depth_avg") / Math.sqrt(num(v, "age") / 365.25)) * Math.sqrt(num(v, "design_life_yr")) * num(v, "safety_factor") },
+    ],
   },
 
   A15: {
@@ -340,11 +361,12 @@ export const schemas: Record<string, TestSchema> = {
   // ---------- SOIL ----------
   B1: {
     code: "B1", name: "Soil Classification (USCS)", standard: "ASTM D2487", category: "soil",
-    description: "Unified Soil Classification.",
+    description: "Unified Soil Classification — full GW/GP/GM/GC/SW/SP/SM/SC/ML/CL/MH/CH branching.",
     sections: [{ title: "Atterberg & gradation", fields: [
       { key: "ll", label: "Liquid limit", unit: "%", type: "number", default: 38 },
       { key: "pl", label: "Plastic limit", unit: "%", type: "number", default: 21 },
-      { key: "p200", label: "Passing #200", unit: "%", type: "number", default: 65 },
+      { key: "p200", label: "Passing #200 (75 µm)", unit: "%", type: "number", default: 65 },
+      { key: "p4", label: "Passing #4 (4.75 mm)", unit: "%", type: "number", default: 90 },
       { key: "d10", label: "D10", unit: "mm", type: "number", default: 0.05 },
       { key: "d30", label: "D30", unit: "mm", type: "number", default: 0.2 },
       { key: "d60", label: "D60", unit: "mm", type: "number", default: 0.6 },
@@ -353,11 +375,17 @@ export const schemas: Record<string, TestSchema> = {
       { label: "Plasticity index", unit: "%", decimals: 1, compute: (v) => num(v, "ll") - num(v, "pl") },
       { label: "Cu", decimals: 2, compute: (v) => num(v, "d60") / num(v, "d10") },
       { label: "Cc", decimals: 2, compute: (v) => num(v, "d30") ** 2 / (num(v, "d60") * num(v, "d10")) },
-      { label: "USCS group", compute: (v) => {
-        const pi = num(v, "ll") - num(v, "pl"), ll = num(v, "ll");
-        if (num(v, "p200") > 50) return ll < 50 ? (pi > 0.73 * (ll - 20) ? "CL" : "ML") : (pi > 0.73 * (ll - 20) ? "CH" : "MH");
-        return num(v, "d60") / num(v, "d10") > 4 ? "SW" : "SP";
-      }},
+      { label: "A-line value", decimals: 1, compute: (v) => 0.73 * Math.max(0, num(v, "ll") - 20) },
+      { label: "USCS symbol", compute: (v) => uscsClassify({
+        ll: num(v, "ll"), pl: num(v, "pl"),
+        passing200: num(v, "p200"), passing4: num(v, "p4"),
+        d10: num(v, "d10"), d30: num(v, "d30"), d60: num(v, "d60"),
+      }).symbol },
+      { label: "Group name", compute: (v) => uscsClassify({
+        ll: num(v, "ll"), pl: num(v, "pl"),
+        passing200: num(v, "p200"), passing4: num(v, "p4"),
+        d10: num(v, "d10"), d30: num(v, "d30"), d60: num(v, "d60"),
+      }).groupName },
     ],
     passRules: [],
   },
@@ -427,21 +455,40 @@ export const schemas: Record<string, TestSchema> = {
 
   B7: {
     code: "B7", name: "California Bearing Ratio (CBR)", standard: "ASTM D1883", category: "soil",
-    description: "Penetration resistance for pavement design.",
+    description: "Penetration resistance vs standard crushed stone (6.9 / 10.3 MPa). Piston area 1935 mm².",
     sections: [{ title: "Inputs", fields: [
-      { key: "load_25", label: "Load at 2.5 mm", unit: "kN", type: "number", default: 7.5 },
-      { key: "load_50", label: "Load at 5.0 mm", unit: "kN", type: "number", default: 11.6 },
+      { key: "load_25", label: "Load at 2.5 mm penetration", unit: "kN", type: "number", default: 7.5 },
+      { key: "load_50", label: "Load at 5.0 mm penetration", unit: "kN", type: "number", default: 11.6 },
       { key: "min_spec", label: "Specified min CBR", unit: "%", type: "number", default: 25 },
+      { key: "swell", label: "Swell after soak", unit: "%", type: "number", default: 0.4 },
     ]}],
     results: [
-      { label: "CBR @ 2.5 mm", unit: "%", decimals: 1, compute: (v) => (num(v, "load_25") * 1000 / 19_350) / 6900 * 100 * 100 },
-      { label: "CBR @ 5.0 mm", unit: "%", decimals: 1, compute: (v) => (num(v, "load_50") * 1000 / 19_350) / 10300 * 100 * 100 },
+      // Unit load (kPa) at piston (1935 mm²) = load_kn * 1e6 / 1935.
+      // CBR % = unit_load / 6900 kPa * 100 (at 2.5 mm) or / 10300 (at 5.0 mm).
+      { label: "Unit load @ 2.5 mm", unit: "kPa", decimals: 0, compute: (v) =>
+        (num(v, "load_25") * 1e6) / 1935 },
+      { label: "Unit load @ 5.0 mm", unit: "kPa", decimals: 0, compute: (v) =>
+        (num(v, "load_50") * 1e6) / 1935 },
+      { label: "CBR @ 2.5 mm", unit: "%", decimals: 1, compute: (v) =>
+        ((num(v, "load_25") * 1e6) / 1935) / 6900 * 100 },
+      { label: "CBR @ 5.0 mm", unit: "%", decimals: 1, compute: (v) =>
+        ((num(v, "load_50") * 1e6) / 1935) / 10300 * 100 },
+      { label: "Reported CBR", unit: "%", decimals: 1, compute: (v) => {
+        const c1 = ((num(v, "load_25") * 1e6) / 1935) / 6900 * 100;
+        const c2 = ((num(v, "load_50") * 1e6) / 1935) / 10300 * 100;
+        // Per ASTM D1883: report CBR @ 2.5 mm unless CBR @ 5.0 is greater (within 10%),
+        // in which case re-test and use 5.0-mm value.
+        return c2 > c1 ? c2 : c1;
+      }},
     ],
-    passRules: [{ label: "≥ specified minimum CBR", ok: (v) => {
-      const c1 = (num(v, "load_25") * 1000 / 19_350) / 6900 * 100 * 100;
-      const c2 = (num(v, "load_50") * 1000 / 19_350) / 10300 * 100 * 100;
-      return Math.max(c1, c2) >= num(v, "min_spec");
-    }}],
+    passRules: [
+      { label: "Reported CBR ≥ specified minimum", ok: (v) => {
+        const c1 = ((num(v, "load_25") * 1e6) / 1935) / 6900 * 100;
+        const c2 = ((num(v, "load_50") * 1e6) / 1935) / 10300 * 100;
+        return Math.max(c1, c2) >= num(v, "min_spec");
+      }},
+      { label: "Swell ≤ 1% (typical pavement subgrade)", ok: (v) => num(v, "swell") <= 1 },
+    ],
   },
 
   B8: {
@@ -521,29 +568,75 @@ export const schemas: Record<string, TestSchema> = {
 
   B12: {
     code: "B12", name: "Consolidation (Oedometer)", standard: "ASTM D2435", category: "soil",
-    description: "Cc, Cr, preconsolidation pressure.",
-    sections: [{ title: "Inputs", fields: [
-      { key: "cc", label: "Compression index Cc", type: "number", default: 0.28 },
-      { key: "cr", label: "Recompression index Cr", type: "number", default: 0.04 },
-      { key: "pc", label: "Preconsolidation pressure", unit: "kPa", type: "number", default: 180 },
-      { key: "cv", label: "Cv", unit: "m²/yr", type: "number", default: 8.5 },
+    description: "Cc, Cr, preconsolidation pressure (Casagrande construction from 4-point e-log p curve).",
+    sections: [{ title: "Specimen", fields: [
+      { key: "e0", label: "Initial void ratio e₀", type: "number", default: 0.95 },
+      { key: "Gs", label: "Specific gravity Gs", type: "number", default: 2.70 },
+      { key: "H_dr", label: "Drainage path", unit: "mm", type: "number", default: 12.7 },
+      { key: "t50", label: "Time at 50% consolidation (Taylor √t)", unit: "min", type: "number", default: 4.2 },
+    ]},
+    { title: "e–log p curve points", description: "Pressure (kPa) and void ratio at each load step.", fields: [
+      { key: "p1", label: "p₁", unit: "kPa", type: "number", default: 25 },
+      { key: "e1", label: "e₁", type: "number", default: 0.945 },
+      { key: "p2", label: "p₂", unit: "kPa", type: "number", default: 100 },
+      { key: "e2", label: "e₂", type: "number", default: 0.92 },
+      { key: "p3", label: "p₃", unit: "kPa", type: "number", default: 200 },
+      { key: "e3", label: "e₃", type: "number", default: 0.83 },
+      { key: "p4", label: "p₄", unit: "kPa", type: "number", default: 400 },
+      { key: "e4", label: "e₄", type: "number", default: 0.71 },
+      { key: "p5", label: "p₅", unit: "kPa", type: "number", default: 800 },
+      { key: "e5", label: "e₅", type: "number", default: 0.58 },
     ]}],
     results: [
-      { label: "Cc", decimals: 3, compute: (v) => num(v, "cc") },
-      { label: "Cr", decimals: 3, compute: (v) => num(v, "cr") },
-      { label: "Pc", unit: "kPa", decimals: 0, compute: (v) => num(v, "pc") },
+      { label: "Compression index Cc", decimals: 3, compute: (v) => {
+        // Cc = -(e₅ - e₃)/log10(p₅/p₃) — slope on virgin compression branch.
+        return -((num(v, "e5") - num(v, "e3")) / Math.log10(num(v, "p5") / num(v, "p3")));
+      }},
+      { label: "Recompression index Cr", decimals: 4, compute: (v) => {
+        return -((num(v, "e2") - num(v, "e1")) / Math.log10(num(v, "p2") / num(v, "p1")));
+      }},
+      { label: "Preconsolidation pressure Pc", unit: "kPa", decimals: 0, compute: (v) =>
+        casagrandePc([
+          { p: num(v, "p1"), e: num(v, "e1") },
+          { p: num(v, "p2"), e: num(v, "e2") },
+          { p: num(v, "p3"), e: num(v, "e3") },
+          { p: num(v, "p4"), e: num(v, "e4") },
+          { p: num(v, "p5"), e: num(v, "e5") },
+        ])
+      },
+      { label: "Cv (Taylor √t)", unit: "m²/yr", decimals: 2, compute: (v) => {
+        // Cv = T50 * H_dr² / t50 ; T50 (Taylor) = 0.848 ; convert mm²/min → m²/yr.
+        const Hdr_m = num(v, "H_dr") / 1000;
+        const t50_yr = num(v, "t50") / (60 * 24 * 365.25);
+        return (0.848 * Hdr_m ** 2) / t50_yr;
+      }},
     ],
     passRules: [],
   },
 
   B13: {
     code: "B13", name: "Direct Shear Test", standard: "ASTM D3080", category: "soil",
-    description: "Shear strength c, φ.",
-    sections: [{ title: "Inputs", fields: [
-      { key: "c", label: "Cohesion", unit: "kPa", type: "number", default: 12 },
-      { key: "phi", label: "Friction angle", unit: "°", type: "number", default: 32 },
+    description: "Shear strength c, φ — least-squares Mohr-Coulomb regression on three (σ, τ) points.",
+    sections: [{ title: "Three normal-stress points", fields: [
+      { key: "s1", label: "σ₁ normal", unit: "kPa", type: "number", default: 50 },
+      { key: "t1", label: "τ₁ peak shear", unit: "kPa", type: "number", default: 41 },
+      { key: "s2", label: "σ₂ normal", unit: "kPa", type: "number", default: 100 },
+      { key: "t2", label: "τ₂ peak shear", unit: "kPa", type: "number", default: 73 },
+      { key: "s3", label: "σ₃ normal", unit: "kPa", type: "number", default: 200 },
+      { key: "t3", label: "τ₃ peak shear", unit: "kPa", type: "number", default: 137 },
     ]}],
-    results: [{ label: "c", unit: "kPa", decimals: 1, compute: (v) => num(v, "c") }, { label: "φ", unit: "°", decimals: 1, compute: (v) => num(v, "phi") }],
+    results: [
+      { label: "Cohesion c", unit: "kPa", decimals: 1, compute: (v) => mohrCoulomb([
+        { sigma: num(v, "s1"), tau: num(v, "t1") },
+        { sigma: num(v, "s2"), tau: num(v, "t2") },
+        { sigma: num(v, "s3"), tau: num(v, "t3") },
+      ]).c },
+      { label: "Friction angle φ", unit: "°", decimals: 1, compute: (v) => mohrCoulomb([
+        { sigma: num(v, "s1"), tau: num(v, "t1") },
+        { sigma: num(v, "s2"), tau: num(v, "t2") },
+        { sigma: num(v, "s3"), tau: num(v, "t3") },
+      ]).phi },
+    ],
     passRules: [],
   },
 
@@ -567,23 +660,50 @@ export const schemas: Record<string, TestSchema> = {
   // ---------- AGGREGATE ----------
   C1: {
     code: "C1", name: "Sieve Analysis", standard: "ASTM C117 / C136", category: "aggregate",
-    description: "Particle size distribution.",
-    sections: [{ title: "Inputs", fields: [
-      { key: "fm", label: "Fineness modulus", type: "number", default: 2.85 },
-      { key: "d10", label: "D10", unit: "mm", type: "number", default: 0.18 },
-      { key: "d30", label: "D30", unit: "mm", type: "number", default: 0.65 },
-      { key: "d60", label: "D60", unit: "mm", type: "number", default: 2.4 },
-    ]}],
+    description: "Particle size distribution. Fineness modulus from cumulative % retained on standard sieves.",
+    sections: [
+      { title: "Cumulative % retained on standard sieves", description: "ASTM C136 sieve set (#100…3 in).", fields: [
+        { key: "r_100", label: "#100 (0.150 mm)", unit: "%", type: "number", default: 95 },
+        { key: "r_50",  label: "#50 (0.300 mm)",  unit: "%", type: "number", default: 78 },
+        { key: "r_30",  label: "#30 (0.600 mm)",  unit: "%", type: "number", default: 60 },
+        { key: "r_16",  label: "#16 (1.18 mm)",   unit: "%", type: "number", default: 40 },
+        { key: "r_8",   label: "#8 (2.36 mm)",    unit: "%", type: "number", default: 12 },
+        { key: "r_4",   label: "#4 (4.75 mm)",    unit: "%", type: "number", default: 0 },
+        { key: "r_38",  label: "3/8 in (9.5 mm)", unit: "%", type: "number", default: 0 },
+        { key: "r_34",  label: "3/4 in (19 mm)",  unit: "%", type: "number", default: 0 },
+        { key: "r_112", label: "1½ in (37.5 mm)", unit: "%", type: "number", default: 0 },
+        { key: "r_3",   label: "3 in (75 mm)",    unit: "%", type: "number", default: 0 },
+      ]},
+      { title: "Effective sizes", fields: [
+        { key: "d10", label: "D10", unit: "mm", type: "number", default: 0.18 },
+        { key: "d30", label: "D30", unit: "mm", type: "number", default: 0.65 },
+        { key: "d60", label: "D60", unit: "mm", type: "number", default: 2.4 },
+      ]},
+    ],
     results: [
-      { label: "Cu", decimals: 2, compute: (v) => num(v, "d60") / num(v, "d10") },
-      { label: "Cc", decimals: 2, compute: (v) => num(v, "d30") ** 2 / (num(v, "d60") * num(v, "d10")) },
-      { label: "Classification", compute: (v) => {
+      { label: "Fineness modulus", decimals: 2, compute: (v) => finenessModulus([
+        num(v, "r_100"), num(v, "r_50"), num(v, "r_30"), num(v, "r_16"),
+        num(v, "r_8"),   num(v, "r_4"),  num(v, "r_38"), num(v, "r_34"),
+        num(v, "r_112"), num(v, "r_3"),
+      ]) },
+      { label: "Cu (uniformity)", decimals: 2, compute: (v) => num(v, "d60") / num(v, "d10") },
+      { label: "Cc (curvature)", decimals: 2, compute: (v) => num(v, "d30") ** 2 / (num(v, "d60") * num(v, "d10")) },
+      { label: "Gradation", compute: (v) => {
         const cu = num(v, "d60") / num(v, "d10");
         const cc = num(v, "d30") ** 2 / (num(v, "d60") * num(v, "d10"));
         return cu >= 4 && cc >= 1 && cc <= 3 ? "Well graded" : "Poorly graded";
       }},
     ],
-    passRules: [],
+    passRules: [
+      { label: "FM 2.3–3.1 (fine aggregate, ASTM C33)", ok: (v) => {
+        const fm = finenessModulus([
+          num(v, "r_100"), num(v, "r_50"), num(v, "r_30"), num(v, "r_16"),
+          num(v, "r_8"),   num(v, "r_4"),  num(v, "r_38"), num(v, "r_34"),
+          num(v, "r_112"), num(v, "r_3"),
+        ]);
+        return fm >= 2.3 && fm <= 3.1;
+      }},
+    ],
   },
 
   C2: {
@@ -968,19 +1088,38 @@ export const schemas: Record<string, TestSchema> = {
 
   E5: {
     code: "E5", name: "Chemical Composition", standard: "ASTM A615 / SASO SSA 2", category: "steel",
-    description: "C, Mn, P, S, Si, Ceq.",
-    sections: [{ title: "Composition", fields: [
-      { key: "C", label: "Carbon", unit: "%", type: "number", default: 0.27 },
+    description: "C, Mn, P, S, Si plus full IIW carbon equivalent including Cr, Mo, V, Ni, Cu.",
+    sections: [{ title: "Composition (% mass)", fields: [
+      { key: "C", label: "Carbon",     unit: "%", type: "number", default: 0.27 },
       { key: "Mn", label: "Manganese", unit: "%", type: "number", default: 1.0 },
       { key: "P", label: "Phosphorus", unit: "%", type: "number", default: 0.025 },
-      { key: "S", label: "Sulfur", unit: "%", type: "number", default: 0.035 },
-      { key: "Si", label: "Silicon", unit: "%", type: "number", default: 0.18 },
+      { key: "S", label: "Sulfur",     unit: "%", type: "number", default: 0.035 },
+      { key: "Si", label: "Silicon",   unit: "%", type: "number", default: 0.18 },
+      { key: "Cr", label: "Chromium",  unit: "%", type: "number", default: 0.05 },
+      { key: "Mo", label: "Molybdenum",unit: "%", type: "number", default: 0.01 },
+      { key: "V", label: "Vanadium",   unit: "%", type: "number", default: 0.01 },
+      { key: "Ni", label: "Nickel",    unit: "%", type: "number", default: 0.05 },
+      { key: "Cu", label: "Copper",    unit: "%", type: "number", default: 0.10 },
+      { key: "grade", label: "Grade", type: "select", default: "60",
+        options: [{ value: "40", label: "Grade 40" }, { value: "60", label: "Grade 60" }, { value: "75", label: "Grade 75" }, { value: "80", label: "Grade 80" }] },
     ]}],
-    results: [{ label: "Carbon equivalent", unit: "%", decimals: 3, compute: (v) => num(v, "C") + num(v, "Mn") / 6 }],
+    results: [
+      { label: "Carbon equivalent (IIW)", unit: "%", decimals: 3, compute: (v) => carbonEquivalent({
+        C: num(v, "C"), Mn: num(v, "Mn"), Cr: num(v, "Cr"), Mo: num(v, "Mo"),
+        V: num(v, "V"), Ni: num(v, "Ni"), Cu: num(v, "Cu"),
+      }) },
+      { label: "Weldability", compute: (v) => {
+        const ce = carbonEquivalent({
+          C: num(v, "C"), Mn: num(v, "Mn"), Cr: num(v, "Cr"), Mo: num(v, "Mo"),
+          V: num(v, "V"), Ni: num(v, "Ni"), Cu: num(v, "Cu"),
+        });
+        return ce <= 0.40 ? "Excellent" : ce <= 0.50 ? "Good" : ce <= 0.55 ? "Fair (preheat)" : "Difficult";
+      }},
+    ],
     passRules: [
       { label: "P ≤ 0.06%", ok: (v) => num(v, "P") <= 0.06 },
       { label: "S ≤ 0.06%", ok: (v) => num(v, "S") <= 0.06 },
-      { label: "C ≤ 0.30%", ok: (v) => num(v, "C") <= 0.30 },
+      { label: "C ≤ grade limit", ok: (v) => num(v, "C") <= (v.grade === "75" ? 0.35 : 0.30) },
     ],
   },
 
@@ -1016,27 +1155,45 @@ export const schemas: Record<string, TestSchema> = {
   // ---------- CEMENT ----------
   F1: {
     code: "F1", name: "Fineness (Blaine)", standard: "ASTM C204 / SASO SSA 1", category: "cement", saudiSpecific: true,
-    description: "Specific surface ≥ 280 m²/kg (OPC).",
+    description: "Specific surface from Blaine permeability time. S = K · √ρ · √t (apparatus constant calibrated to m²/kg).",
     sections: [{ title: "Inputs", fields: [
-      { key: "k", label: "Apparatus constant", type: "number", default: 1.5 },
+      { key: "k", label: "Apparatus constant K", type: "number", default: 21.5,
+        help: "Calibrated against NIST 114 reference cement so the formula returns m²/kg directly." },
       { key: "rho", label: "Cement density", unit: "g/cm³", type: "number", default: 3.15 },
       { key: "t", label: "Air-flow time", unit: "s", type: "number", default: 78 },
+      { key: "cement_type", label: "Cement type", type: "select", default: "OPC",
+        options: [{ value: "OPC", label: "Ordinary Portland (≥ 280)" }, { value: "SRC", label: "Sulfate-resistant (≥ 300)" }] },
     ]}],
     results: [{ label: "Specific surface", unit: "m²/kg", decimals: 0, compute: (v) =>
-      num(v, "k") * Math.sqrt(num(v, "rho")) * Math.sqrt(num(v, "t")) * 100 }],
-    passRules: [{ label: "≥ 280 m²/kg", ok: (v) =>
-      num(v, "k") * Math.sqrt(num(v, "rho")) * Math.sqrt(num(v, "t")) * 100 >= 280 }],
+      num(v, "k") * Math.sqrt(num(v, "rho")) * Math.sqrt(num(v, "t")) }],
+    passRules: [{ label: "Above SASO SSA 1 limit for cement type", ok: (v) => {
+      const s = num(v, "k") * Math.sqrt(num(v, "rho")) * Math.sqrt(num(v, "t"));
+      return s >= (v.cement_type === "SRC" ? 300 : 280);
+    }}],
   },
 
   F2: {
     code: "F2", name: "Normal Consistency", standard: "ASTM C187", category: "cement",
-    description: "Water for standard paste.",
+    description: "Water for standard paste. Vicat plunger penetration must equal 10 ± 1 mm from the bottom.",
     sections: [{ title: "Inputs", fields: [
       { key: "cement", label: "Cement mass", unit: "g", type: "number", default: 650 },
       { key: "water", label: "Water added", unit: "mL", type: "number", default: 175 },
+      { key: "penetration", label: "Vicat plunger penetration", unit: "mm", type: "number", default: 10,
+        help: "Standard paste reaches normal consistency when penetration is 10 ± 1 mm." },
     ]}],
-    results: [{ label: "Water requirement", unit: "%", decimals: 1, compute: (v) => (num(v, "water") / num(v, "cement")) * 100 }],
-    passRules: [],
+    results: [
+      { label: "Water requirement", unit: "%", decimals: 1, compute: (v) => (num(v, "water") / num(v, "cement")) * 100 },
+      { label: "Penetration result", compute: (v) => {
+        const p = num(v, "penetration");
+        return p >= 9 && p <= 11 ? "At normal consistency" : p < 9 ? "Too dry — add water" : "Too wet — reduce water";
+      }},
+    ],
+    passRules: [
+      { label: "Penetration 10 ± 1 mm", ok: (v) => {
+        const p = num(v, "penetration");
+        return p >= 9 && p <= 11;
+      }},
+    ],
   },
 
   F3: {
