@@ -16,8 +16,6 @@ export function NewEquipmentButton() {
   const tt = useT();
   const canCreate = useCan("equipment:create");
   const [open, setOpen] = useState(false);
-  if (!canCreate) return null;
-
   const [code, setCode] = useState(autoCode());
   const [name, setName] = useState("");
   const [manufacturer, setManufacturer] = useState("");
@@ -25,6 +23,7 @@ export function NewEquipmentButton() {
   const [serial, setSerial] = useState("");
   const [calibrationDue, setCalibrationDue] = useState(addDays(180));
   const [status, setStatus] = useState<Equipment["status"]>("active");
+  if (!canCreate) return null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

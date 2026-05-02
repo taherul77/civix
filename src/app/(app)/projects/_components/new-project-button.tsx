@@ -15,8 +15,6 @@ export function NewProjectButton() {
   const tt = useT();
   const canCreate = useCan("project:create");
   const [open, setOpen] = useState(false);
-  if (!canCreate) return null;
-
   const [code, setCode] = useState(autoCode());
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
@@ -26,6 +24,7 @@ export function NewProjectButton() {
   const [startDate, setStartDate] = useState(today());
   const [endDate, setEndDate] = useState("");
   const [contractValue, setContractValue] = useState("");
+  if (!canCreate) return null;
 
   const reset = () => {
     setCode(autoCode());

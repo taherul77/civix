@@ -19,14 +19,13 @@ export function NewUserButton() {
   const tt = useT();
   const canInvite = useCan("user:invite");
   const [open, setOpen] = useState(false);
-  if (!canInvite) return null;
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState(ROLES[0]);
   const [dept, setDept] = useState(DEPTS[0]);
   const [status, setStatus] = useState<User["status"]>("active");
   const [mfa, setMfa] = useState(true);
+  if (!canInvite) return null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

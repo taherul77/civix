@@ -16,13 +16,12 @@ export function NewInvoiceButton() {
   const tt = useT();
   const canCreate = useCan("billing:create");
   const [open, setOpen] = useState(false);
-  if (!canCreate) return null;
-
   const [id, setId] = useState(autoId());
   const [client, setClient] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<Invoice["status"]>("draft");
+  if (!canCreate) return null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

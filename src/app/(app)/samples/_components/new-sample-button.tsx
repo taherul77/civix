@@ -29,8 +29,6 @@ export function NewSampleButton() {
   const actor = useActor();
   const canCreate = useCan("sample:create");
   const [open, setOpen] = useState(false);
-  if (!canCreate) return null;
-
   const [code, setCode] = useState(autoSampleCode());
   const [type, setType] = useState<Sample["type"]>("concrete");
   const [projectId, setProjectId] = useState("");
@@ -38,6 +36,7 @@ export function NewSampleButton() {
   const [sampledBy, setSampledBy] = useState("");
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<Sample["status"]>("pending");
+  if (!canCreate) return null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

@@ -120,42 +120,75 @@ export const auth = {
     await tick();
     if (!input.email || !input.password) throw errors.validation("Email and password required");
 
-    // Try the real backend first. The dropdown carries the tenant's display
-    // *name* ("Saudi Aramco Materials Lab"), but the backend looks up tenants
-    // by *subdomain* ("aramco-lab"). Map known names → subdomains explicitly,
-    // and only fall back to slugifying the raw value as a last resort.
+    // Two-step backend flow: /v1/auth/signin returns a short-lived userToken
+    // plus the user's tenant memberships. /v1/auth/select-tenant then trades
+    // userToken + chosen tenantId for the real tenant-scoped session JWT.
+    // The dropdown carries the tenant's display *name* — map it to a subdomain
+    // so we can pick the matching membership after sign-in.
     const TENANT_NAME_TO_SUBDOMAIN: Record<string, string> = {
       "Saudi Aramco Materials Lab": "aramco-lab",
+      "SABIC Quality Lab": "sabic-lab",
     };
-    const tenantSubdomain =
+    const wantedSubdomain =
       TENANT_NAME_TO_SUBDOMAIN[input.tenant] ??
       (((input.tenant || "").toLowerCase().replace(/\s+/g, "-")) || "aramco-lab");
     try {
-      const out = await apiFetch<{
-        token: string;
-        session: { email: string; name: string; role: string; tenant: string; permissions: string[]; mfaRequired: boolean };
+      const step1 = await apiFetch<{
+        userToken: string;
+        user: { id: string; email: string; name: string; mfaRequired: boolean };
+        memberships: Array<{
+          tenantId: string;
+          tenantName: string;
+          subdomain: string;
+          logoUrl: string | null;
+          role: string;
+          department: string | null;
+        }>;
       }>("/v1/auth/signin", {
         method: "POST",
         noAuth: true,
-        body: { email: input.email, password: input.password, tenantSubdomain },
+        body: { email: input.email, password: input.password },
+      });
+
+      if (!step1.memberships || step1.memberships.length === 0) {
+        throw errors.forbidden("auth", "User is not a member of any company");
+      }
+      const chosen =
+        step1.memberships.find((m) => m.subdomain === wantedSubdomain) ??
+        step1.memberships[0];
+      if (!chosen) {
+        throw errors.forbidden("auth", "No accessible company found for this account");
+      }
+
+      // Stash the userToken so apiFetch can attach it to /select-tenant.
+      useApp.getState().setApiToken(step1.userToken, chosen.subdomain);
+
+      const step2 = await apiFetch<{
+        token: string;
+        session: { email: string; name: string; role: string; tenant: string; permissions: string[]; mfaRequired: boolean };
+      }>("/v1/auth/select-tenant", {
+        method: "POST",
+        body: { tenantId: chosen.tenantId },
       });
 
       const session: SessionRecord = {
-        email: out.session.email,
-        name: out.session.name || input.email.split("@")[0],
-        role: out.session.role,
-        tenant: out.session.tenant,
-        permissions: out.session.permissions as SessionRecord["permissions"],
+        email: step2.session.email,
+        name: step2.session.name || input.email.split("@")[0],
+        role: step2.session.role,
+        tenant: step2.session.tenant,
+        permissions: step2.session.permissions as SessionRecord["permissions"],
       };
-      useApp.getState().setApiToken(out.token, tenantSubdomain);
+      useApp.getState().setApiToken(step2.token, chosen.subdomain);
       useApp.getState().signIn({ email: session.email, name: session.name, role: session.role, tenant: session.tenant });
       return { kind: "session", session };
     } catch (err) {
-      // Backend unreachable or bad credentials — fall through to mock path
-      // so the demo experience still works without a running API.
+      // Network failure → fall through to mock path so demo still works.
+      // Auth failures (401/403) bubble up to the caller.
       if (err instanceof Error && /fetch|Network|Failed/.test(err.message)) {
-        // network failure → continue to mock
+        useApp.getState().setApiToken(null, null);
+        // continue to mock
       } else {
+        useApp.getState().setApiToken(null, null);
         throw err;
       }
     }

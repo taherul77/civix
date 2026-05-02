@@ -17,8 +17,8 @@ const tenants = [
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("eng.fahad@aramco-lab.sa");
-  const [password, setPassword] = useState("demo");
+  const [email, setEmail] = useState("fahad@aramco-lab.sa");
+  const [password, setPassword] = useState("demo1234!");
   const [tenant, setTenant] = useState(tenants[0].id);
   const [role, setRole] = useState<string>("Lab Engineer");
   const [loading, setLoading] = useState(false);
