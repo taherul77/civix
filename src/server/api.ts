@@ -120,67 +120,82 @@ export const auth = {
     await tick();
     if (!input.email || !input.password) throw errors.validation("Email and password required");
 
-    // Two-step backend flow: /v1/auth/signin returns a short-lived userToken
-    // plus the user's tenant memberships. /v1/auth/select-tenant then trades
-    // userToken + chosen tenantId for the real tenant-scoped session JWT.
-    // The dropdown carries the tenant's display *name* — map it to a subdomain
-    // so we can pick the matching membership after sign-in.
-    const TENANT_NAME_TO_SUBDOMAIN: Record<string, string> = {
-      "Saudi Aramco Materials Lab": "aramco-lab",
-      "SABIC Quality Lab": "sabic-lab",
-    };
-    const wantedSubdomain =
-      TENANT_NAME_TO_SUBDOMAIN[input.tenant] ??
-      (((input.tenant || "").toLowerCase().replace(/\s+/g, "-")) || "aramco-lab");
+    // Two-step backend flow:
+    //   1. /v1/auth/signin → either a Super Admin token (kind:"super-admin")
+    //      or a short-lived userToken + tenant memberships (kind:"user").
+    //   2. If memberships.length === 1 → auto-call /v1/auth/select-tenant.
+    //      If memberships.length > 1  → return {kind:"pick-tenant"} and let
+    //      the form show a company picker; the form then calls auth.selectTenant.
     try {
-      const step1 = await apiFetch<{
-        userToken: string;
-        user: { id: string; email: string; name: string; mfaRequired: boolean };
-        memberships: Array<{
-          tenantId: string;
-          tenantName: string;
-          subdomain: string;
-          logoUrl: string | null;
-          role: string;
-          department: string | null;
-        }>;
-      }>("/v1/auth/signin", {
+      const step1 = await apiFetch<
+        | {
+            kind: "super-admin";
+            token: string;
+            user: { id: string; email: string; name: string; isSuperAdmin: true };
+          }
+        | {
+            kind: "user";
+            userToken: string;
+            user: { id: string; email: string; name: string; mfaRequired: boolean; isSuperAdmin: false };
+            memberships: Array<{
+              tenantId: string;
+              tenantName: string;
+              subdomain: string;
+              logoUrl: string | null;
+              role: string;
+              department: string | null;
+            }>;
+          }
+      >("/v1/auth/signin", {
         method: "POST",
         noAuth: true,
         body: { email: input.email, password: input.password },
       });
 
+      // Super Admin path — no tenant; UI routes to /super for tenant management.
+      if (step1.kind === "super-admin") {
+        const session: SessionRecord = {
+          email: step1.user.email,
+          name: step1.user.name || step1.user.email.split("@")[0],
+          role: "Super Admin",
+          tenant: "—",
+          permissions: [],
+        };
+        useApp.getState().setApiToken(step1.token, null);
+        useApp.getState().signIn({
+          email: session.email,
+          name: session.name,
+          role: session.role,
+          tenant: session.tenant,
+          isSuperAdmin: true,
+        });
+        return { kind: "session", session };
+      }
+
       if (!step1.memberships || step1.memberships.length === 0) {
         throw errors.forbidden("auth", "User is not a member of any company");
       }
-      const chosen =
-        step1.memberships.find((m) => m.subdomain === wantedSubdomain) ??
-        step1.memberships[0];
-      if (!chosen) {
-        throw errors.forbidden("auth", "No accessible company found for this account");
+
+      // Stash the userToken so subsequent /select-tenant call carries it.
+      useApp.getState().setApiToken(step1.userToken, null);
+
+      // Multiple memberships → let the UI render a picker.
+      if (step1.memberships.length > 1) {
+        return {
+          kind: "pick-tenant",
+          memberships: step1.memberships.map((m) => ({
+            tenantId:   m.tenantId,
+            tenantName: m.tenantName,
+            subdomain:  m.subdomain,
+            logoUrl:    m.logoUrl,
+            role:       m.role,
+            department: m.department,
+          })),
+        };
       }
 
-      // Stash the userToken so apiFetch can attach it to /select-tenant.
-      useApp.getState().setApiToken(step1.userToken, chosen.subdomain);
-
-      const step2 = await apiFetch<{
-        token: string;
-        session: { email: string; name: string; role: string; tenant: string; permissions: string[]; mfaRequired: boolean };
-      }>("/v1/auth/select-tenant", {
-        method: "POST",
-        body: { tenantId: chosen.tenantId },
-      });
-
-      const session: SessionRecord = {
-        email: step2.session.email,
-        name: step2.session.name || input.email.split("@")[0],
-        role: step2.session.role,
-        tenant: step2.session.tenant,
-        permissions: step2.session.permissions as SessionRecord["permissions"],
-      };
-      useApp.getState().setApiToken(step2.token, chosen.subdomain);
-      useApp.getState().signIn({ email: session.email, name: session.name, role: session.role, tenant: session.tenant });
-      return { kind: "session", session };
+      // Exactly one membership → enter directly.
+      return await this.selectTenant(step1.memberships[0]!.tenantId);
     } catch (err) {
       // Network failure → fall through to mock path so demo still works.
       // Auth failures (401/403) bubble up to the caller.
@@ -193,12 +208,16 @@ export const auth = {
       }
     }
 
+    // Offline mock fallback — only reached when the backend was unreachable.
+    // Defaults are applied when the form no longer collects tenant/role.
     const name = (input.email
       .split("@")[0] ?? input.email)
       .split(".")
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
       .join(" ");
-    const pending = { email: input.email, name, role: input.role, tenant: input.tenant };
+    const fallbackRole   = input.role   ?? "Lab Engineer";
+    const fallbackTenant = input.tenant ?? "Demo Lab";
+    const pending = { email: input.email, name, role: fallbackRole, tenant: fallbackTenant };
 
     // If the user has enrolled MFA, hold the session in `pendingSignIn`
     // and require a TOTP code. Otherwise complete sign-in immediately.
@@ -210,7 +229,7 @@ export const auth = {
 
     useApp.getState().signIn(pending);
     useData.getState().log({
-      user: `${name} (${input.role})`,
+      user: `${name} (${fallbackRole})`,
       email: input.email,
       action: "login",
       entity: "session",
@@ -221,11 +240,55 @@ export const auth = {
       session: {
         email: input.email,
         name,
-        role: input.role,
-        tenant: input.tenant,
-        permissions: rolePermissions(input.role),
+        role: fallbackRole,
+        tenant: fallbackTenant,
+        permissions: rolePermissions(fallbackRole),
       },
     };
+  },
+
+  /**
+   * Step 2 of the picker flow. Trades the userToken (already in the store
+   * from a prior signIn call) plus the chosen tenantId for a tenant-scoped
+   * session JWT, then hydrates the page-permission matrix from the backend.
+   */
+  async selectTenant(tenantId: string): Promise<MfaSignInResult> {
+    const out = await apiFetch<{
+      token: string;
+      session: { email: string; name: string; role: string; tenant: string; permissions: string[]; mfaRequired: boolean; isSuperAdmin?: boolean };
+    }>("/v1/auth/select-tenant", {
+      method: "POST",
+      body: { tenantId },
+    });
+
+    const session: SessionRecord = {
+      email: out.session.email,
+      name: out.session.name || out.session.email.split("@")[0],
+      role: out.session.role,
+      tenant: out.session.tenant,
+      permissions: out.session.permissions as SessionRecord["permissions"],
+    };
+    useApp.getState().setApiToken(out.token, null);
+    useApp.getState().signIn({
+      email: session.email,
+      name: session.name,
+      role: session.role,
+      tenant: session.tenant,
+      isSuperAdmin: !!out.session.isSuperAdmin,
+    });
+
+    // Hydrate the per-tenant page-permission matrix so the sidebar can
+    // apply view-rules immediately. Failure is non-fatal.
+    try {
+      const perms = await apiFetch<{
+        items: Array<{ role: string; pageId: string; view: boolean; create: boolean; edit: boolean; delete: boolean }>;
+      }>("/v1/role-permissions");
+      useApp.getState().hydratePagePermissions(perms.items);
+    } catch {
+      // ignore — defaults will apply
+    }
+
+    return { kind: "session", session };
   },
 
   async verifyMfa(input: MfaVerifyInput): Promise<SessionRecord> {
@@ -928,7 +991,7 @@ export const invoices = {
 export const zatca = {
   async issueCsid(): Promise<{ serial: string; expiresAt: string }> {
     await tick();
-    const actor = requirePerm("settings:write");
+    const actor = requirePerm("settings:update");
     const fresh = await issueCsid();
     useData.getState().setCsid({
       serial: fresh.serial,
@@ -1200,7 +1263,77 @@ export const reports = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Roles (tenant-scoped, used by /settings/roles)
+// ---------------------------------------------------------------------------
+
+export interface ApiRole {
+  name: string;
+  permissions: string[];
+  isCustom: boolean;
+}
+
+export const roles = {
+  async list(): Promise<ApiRole[]> {
+    await tick();
+    if (isBackendActive()) {
+      const out = await apiFetch<{ items: ApiRole[] }>("/v1/roles");
+      return out.items;
+    }
+    requireAuth();
+    const { customRoles, roleMatrix } = useApp.getState();
+    const builtIn = (await import("@/lib/rbac")).ALL_ROLES;
+    const items: ApiRole[] = builtIn.map((name) => ({
+      name,
+      permissions: roleMatrix[name] ?? rolePermissions(name),
+      isCustom: false,
+    }));
+    for (const r of customRoles) {
+      items.push({ name: r.name, permissions: roleMatrix[r.name] ?? r.perms, isCustom: true });
+    }
+    return items;
+  },
+  async create(input: { name: string; permissions?: string[] }): Promise<ApiRole> {
+    await tick();
+    if (isBackendActive()) {
+      return apiFetch<ApiRole>("/v1/roles", {
+        method: "POST",
+        body: { name: input.name, permissions: input.permissions ?? [] },
+      });
+    }
+    const actor = requirePerm("security:update");
+    void actor;
+    useApp.getState().addCustomRole(input.name);
+    if (input.permissions) useApp.getState().setRoleMatrix(input.name, input.permissions);
+    return { name: input.name, permissions: input.permissions ?? [], isCustom: true };
+  },
+  async update(name: string, permissions: string[]): Promise<ApiRole> {
+    await tick();
+    if (isBackendActive()) {
+      return apiFetch<ApiRole>(`/v1/roles/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        body: { permissions },
+      });
+    }
+    const actor = requirePerm("security:update");
+    void actor;
+    useApp.getState().setRoleMatrix(name, permissions);
+    const isCustom = useApp.getState().customRoles.some((r) => r.name === name);
+    return { name, permissions, isCustom };
+  },
+  async remove(name: string): Promise<void> {
+    await tick();
+    if (isBackendActive()) {
+      await apiFetch(`/v1/roles/${encodeURIComponent(name)}`, { method: "DELETE" });
+      return;
+    }
+    const actor = requirePerm("security:update");
+    void actor;
+    useApp.getState().removeCustomRole(name);
+  },
+};
+
 // Single-namespace export so call sites read `api.tests.list(...)`.
 export const api = {
-  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca,
+  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles,
 };

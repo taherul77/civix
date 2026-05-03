@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { type User } from "@/store/data-store";
@@ -8,20 +8,39 @@ import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
 import { useCan } from "@/lib/auth-context";
+import { useApp } from "@/store/app-store";
+import { SUPER_ADMIN_ROLE } from "@/lib/rbac";
 
-const ROLES = [
-  "Lab Engineer", "Project Manager", "Lab Technician", "Field Technician",
-  "Approver", "Quality Manager", "Administrator",
-];
 const DEPTS = ["Concrete", "Soil", "Aggregate", "Asphalt", "Steel", "Cement", "Quality", "Field"];
 
 export function NewUserButton() {
   const tt = useT();
   const canInvite = useCan("user:invite");
+  const isSuperAdmin = useApp((s) => s.user?.isSuperAdmin ?? false);
+
+  // Roles fetched from /v1/roles for this tenant. Super Admin is platform-only,
+  // so we hide it from non-super-admin actors.
+  const [allRoles, setAllRoles] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.roles
+      .list()
+      .then((items) => {
+        if (cancelled) return;
+        setAllRoles(items.map((r) => r.name));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
+  const ROLES = useMemo(
+    () => allRoles.filter((n) => isSuperAdmin || n !== SUPER_ADMIN_ROLE),
+    [allRoles, isSuperAdmin],
+  );
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState(ROLES[0]);
+  const [role, setRole] = useState("");
   const [dept, setDept] = useState(DEPTS[0]);
   const [status, setStatus] = useState<User["status"]>("active");
   const [mfa, setMfa] = useState(true);

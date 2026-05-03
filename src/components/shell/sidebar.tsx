@@ -26,10 +26,15 @@ import {
   Cog,
   ChevronDown,
   ChevronRight,
+  UserCog,
+  ShieldHalf,
+  UsersRound,
+  Crown,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
 import { t, useT, type DictKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { PAGE_BY_HREF } from "@/lib/page-catalog";
 
 type IconType = typeof LayoutDashboard;
 
@@ -51,7 +56,13 @@ type NavItem = LeafItem | BranchItem;
 const isBranch = (it: NavItem): it is BranchItem =>
   (it as BranchItem).children !== undefined;
 
+// Marker key — branches with this key only render when the active session
+// is a Super Admin.
+const SUPER_ONLY_KEY = "super";
+
 // All top-level entries are collapsible branches (no group section titles).
+// The Super Admin branch is appended to the END of the list further down so
+// it renders at the bottom of the sidebar (above the footer chip).
 const groups: { title: string; items: NavItem[] }[] = [
   {
     title: "",
@@ -109,7 +120,9 @@ const groups: { title: string; items: NavItem[] }[] = [
         label: "Master setup",
         icon: Cog,
         children: [
-          { href: "/company", key: "company", label: "Company setup", icon: Building2 },
+          { href: "/company",    key: "company",    label: "Company setup",    icon: Building2 },
+          { href: "/laboratory", key: "laboratory", label: "Laboratory setup", icon: FlaskConical },
+          { href: "/user-setup", key: "user-setup", label: "User setup",       icon: Users },
         ],
       },
       {
@@ -121,7 +134,29 @@ const groups: { title: string; items: NavItem[] }[] = [
           { href: "/security",    key: "security",    label: "Security",    icon: KeyRound },
           { href: "/white-label", key: "white-label", label: "White-label", icon: Palette },
           { href: "/billing",     key: "billing",     label: "Billing",     icon: Receipt },
-          { href: "/settings",    key: "settings",    icon: Settings },
+        ],
+      },
+      // Settings as its own top-level branch, separate from Admin.
+      {
+        key: "settings",
+        label: "Settings",
+        icon: Settings,
+        children: [
+          { href: "/settings",             key: "settings-general", label: "General",          icon: Settings },
+          { href: "/settings/profile",     key: "profile-setting",  label: "Profile setting",  icon: UserCog },
+          { href: "/settings/permissions", key: "page-permissions", label: "Page permissions", icon: ShieldHalf },
+          { href: "/settings/roles",       key: "role-management",  label: "Role management",  icon: UsersRound },
+        ],
+      },
+      // Super Admin branch — last item in the menu so it sits at the bottom
+      // of the sidebar (just above the footer chip). Hidden from non-super
+      // users by the visibleGroups filter below.
+      {
+        key: SUPER_ONLY_KEY,
+        label: "Super Admin",
+        icon: Crown,
+        children: [
+          { href: "/super", key: "super-tenants", label: "Companies", icon: Building2 },
         ],
       },
     ],
@@ -156,20 +191,79 @@ function collectBranchKeysContainingActive(items: NavItem[], pathname: string): 
   return out;
 }
 
+// Apply per-role page-permission visibility:
+//  - Leaf: hidden if the role has no `view` access for that page.
+//          Pages not in the catalog default to visible.
+//  - Branch: hidden if all children get filtered out.
+function filterByViewAccess(
+  items: NavItem[],
+  canSee: (pageId: string) => boolean
+): NavItem[] {
+  const out: NavItem[] = [];
+  for (const it of items) {
+    if (isBranch(it)) {
+      const filteredChildren = filterByViewAccess(it.children, canSee);
+      if (filteredChildren.length > 0) {
+        out.push({ ...it, children: filteredChildren });
+      }
+    } else {
+      const def = PAGE_BY_HREF[it.href];
+      if (!def || canSee(def.id)) out.push(it);
+    }
+  }
+  return out;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { lang, sidebarCollapsed } = useApp();
+  const user = useApp((s) => s.user);
+  const hasPageAction = useApp((s) => s.hasPageAction);
+  const pagePermissions = useApp((s) => s.pagePermissions);
   const tt = useT();
   const collapsed = sidebarCollapsed;
+
+  // Filter the entire menu by:
+  //   1. Super Admin gating — the Super branch only appears for super admins.
+  //   2. Per-role page-view permissions from the matrix. Super Admin bypasses
+  //      this entirely (hasPageAction returns true for "Super Admin"), so they
+  //      see every menu and can enter any tenant via /super.
+  // Pages missing from the catalog default to visible. Branches with no
+  // remaining visible children are dropped entirely.
+  const visibleGroups = useMemo(() => {
+    const role = user?.role ?? null;
+    const isSuper = !!user?.isSuperAdmin;
+    const canSee = (pageId: string) => hasPageAction(role, pageId, "view");
+    return groups.map((g) => ({
+      ...g,
+      items: g.items
+        .filter((item) => {
+          // Super branch — super admins only.
+          if (isBranch(item) && item.key === SUPER_ONLY_KEY) return isSuper;
+          return true;
+        })
+        .map((item) => {
+          // Super branch is shown as-is; everything else passes through the
+          // view-permission filter. Super Admin always passes.
+          if (isBranch(item) && item.key === SUPER_ONLY_KEY) return item;
+          const filtered = filterByViewAccess([item], canSee);
+          return filtered[0];
+        })
+        .filter((item): item is NavItem => item !== undefined),
+    }));
+    // pagePermissions in deps so toggling perms in /settings/permissions
+    // re-renders the sidebar live.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role, user?.isSuperAdmin, pagePermissions, hasPageAction]);
 
   // Auto-open any branch that contains the active route on first render.
   const initialOpen = useMemo(() => {
     const set = new Set<string>();
-    for (const g of groups) {
+    for (const g of visibleGroups) {
       collectBranchKeysContainingActive(g.items, pathname).forEach((k) => set.add(k));
     }
     return set;
-  }, [pathname]);
+  }, [pathname, visibleGroups]);
   const [expanded, setExpanded] = useState<Set<string>>(initialOpen);
   const toggle = (k: string) =>
     setExpanded((prev) => {
@@ -294,7 +388,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-4", collapsed ? "px-2.5" : "px-4")}>
-        {groups.map((g, gi) => (
+        {visibleGroups.map((g, gi) => (
           <div key={g.title || `group-${gi}`} className="mb-4">
             {g.title && (
               <div className={cn(

@@ -32,7 +32,8 @@ export interface SessionRecord {
 
 export type MfaSignInResult =
   | { kind: "session";       session: SessionRecord }
-  | { kind: "mfa-required";  email: string; name: string };
+  | { kind: "mfa-required";  email: string; name: string }
+  | { kind: "pick-tenant";   memberships: MembershipChoice[] };
 
 export interface MfaEnrolmentInit {
   secret: string;
@@ -88,8 +89,20 @@ export type CreateInvoiceInput   = InvoiceRecord;
 export interface SignInInput {
   email: string;
   password: string;
-  tenant: string;
+  /** Optional fallback tenant name — only used by the offline mock path. */
+  tenant?: string;
+  /** Optional fallback role — only used by the offline mock path. */
+  role?: string;
+}
+
+/** One company the user belongs to, returned by the backend after sign-in. */
+export interface MembershipChoice {
+  tenantId: string;
+  tenantName: string;
+  subdomain: string;
+  logoUrl?: string | null;
   role: string;
+  department?: string | null;
 }
 
 export interface MfaVerifyInput {

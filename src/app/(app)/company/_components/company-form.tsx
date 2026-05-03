@@ -27,7 +27,7 @@ const TIERS = ["starter", "professional", "enterprise"] as const;
 
 export function CompanyForm() {
   const tt = useT();
-  const canEdit = useCan("settings:write");
+  const canEdit = useCan("settings:update");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -3,6 +3,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Lang } from "@/lib/i18n";
+import {
+  type AllRolePermissions,
+  type PageAction,
+  type RolePagePermissions,
+  defaultRolePermissions,
+} from "@/lib/page-catalog";
 
 type Theme = "light" | "dark";
 
@@ -11,6 +17,7 @@ interface SessionUser {
   name: string;
   role: string;
   tenant: string;
+  isSuperAdmin?: boolean;
 }
 
 interface AppState {
@@ -31,6 +38,17 @@ interface AppState {
   // Pending signin awaiting MFA challenge (cleared on success/cancel).
   pendingSignIn: SessionUser | null;
 
+  // Per-role page permissions: { roleName: { pageId: { view, create, edit, delete } } }
+  // Roles not present here fall back to `defaultRolePermissions()` (view-only on every page).
+  // "Super Admin" and "Tenant Admin" implicitly grant everything regardless of state.
+  pagePermissions: AllRolePermissions;
+
+  // Tenant-scoped Role Management state (cleared on signOut so each tenant
+  // session gets its own matrix). roleMatrix overrides the rbac.ts defaults
+  // per role; entries absent here fall back to rolePermissions(role).
+  roleMatrix: Record<string, string[]>;
+  customRoles: Array<{ name: string; perms: string[] }>;
+
   setLang: (l: Lang) => void;
   setTheme: (t: Theme) => void;
   toggleSidebar: () => void;
@@ -45,6 +63,18 @@ interface AppState {
   enrolMfa: (email: string, secret: string, recoveryCodes: string[]) => void;
   consumeRecoveryCode: (email: string, code: string) => boolean;
   clearMfa: (email: string) => void;
+
+  setRoleMatrix: (role: string, perms: string[]) => void;
+  addCustomRole: (name: string) => void;
+  removeCustomRole: (name: string) => void;
+
+  setRolePagePermissions: (role: string, perms: RolePagePermissions) => void;
+  resetRolePagePermissions: (role: string) => void;
+  hasPageAction: (role: string | null | undefined, pageId: string, action: PageAction) => boolean;
+  /** Replace the entire pagePermissions map from a flat list returned by /v1/role-permissions. */
+  hydratePagePermissions: (
+    items: Array<{ role: string; pageId: string; view: boolean; create: boolean; edit: boolean; delete: boolean }>
+  ) => void;
 }
 
 export const useApp = create<AppState>()(
@@ -58,12 +88,26 @@ export const useApp = create<AppState>()(
       apiTenantSubdomain: null,
       mfa: {},
       pendingSignIn: null,
+      pagePermissions: {},
+      roleMatrix: {},
+      customRoles: [],
       setLang: (lang) => set({ lang }),
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       signIn: (user) => set({ user, pendingSignIn: null }),
-      signOut: () => set({ user: null, pendingSignIn: null, apiToken: null, apiTenantSubdomain: null }),
+      signOut: () => set({
+        user: null,
+        pendingSignIn: null,
+        apiToken: null,
+        apiTenantSubdomain: null,
+        // Drop the per-tenant page-permission matrix so the next user (in a
+        // possibly different tenant) doesn't briefly see the previous user's
+        // matrix before their hydration completes.
+        pagePermissions: {},
+        roleMatrix: {},
+        customRoles: [],
+      }),
       setApiToken: (apiToken, apiTenantSubdomain = null) =>
         set({ apiToken, apiTenantSubdomain: apiTenantSubdomain ?? get().apiTenantSubdomain }),
 
@@ -90,6 +134,55 @@ export const useApp = create<AppState>()(
           delete next[email];
           return { mfa: next };
         }),
+
+      setRoleMatrix: (role, perms) =>
+        set((s) => ({ roleMatrix: { ...s.roleMatrix, [role]: perms } })),
+      addCustomRole: (name) =>
+        set((s) =>
+          s.customRoles.some((r) => r.name === name)
+            ? s
+            : { customRoles: [...s.customRoles, { name, perms: [] }] },
+        ),
+      removeCustomRole: (name) =>
+        set((s) => {
+          const nextMatrix = { ...s.roleMatrix };
+          delete nextMatrix[name];
+          return {
+            customRoles: s.customRoles.filter((r) => r.name !== name),
+            roleMatrix: nextMatrix,
+          };
+        }),
+
+      setRolePagePermissions: (role, perms) =>
+        set((s) => ({ pagePermissions: { ...s.pagePermissions, [role]: perms } })),
+      resetRolePagePermissions: (role) =>
+        set((s) => {
+          const next = { ...s.pagePermissions };
+          delete next[role];
+          return { pagePermissions: next };
+        }),
+      hasPageAction: (role, pageId, action) => {
+        if (!role) return false;
+        // Super Admin is the only role that bypasses the matrix entirely.
+        // Tenant Admin follows the matrix like every other role — they
+        // default to view-everything but can be restricted from
+        // /settings/permissions if a Super Admin chooses to.
+        if (role === "Super Admin") return true;
+        const stored = get().pagePermissions[role];
+        const perms = stored ?? defaultRolePermissions();
+        const pageEntry = perms[pageId];
+        return !!pageEntry?.[action];
+      },
+      hydratePagePermissions: (items) => {
+        const next: AllRolePermissions = {};
+        for (const it of items) {
+          if (!next[it.role]) next[it.role] = {};
+          next[it.role][it.pageId] = {
+            view: it.view, create: it.create, edit: it.edit, delete: it.delete,
+          };
+        }
+        set({ pagePermissions: next });
+      },
     }),
     { name: "civixlab-app" }
   )

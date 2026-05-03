@@ -12,7 +12,7 @@ function daysUntil(iso: string) {
 
 export function CsidCard() {
   const csid = useData((s) => s.csid);
-  const canRotate = useCan("settings:write");
+  const canRotate = useCan("settings:update");
 
   const issue = async () => {
     await mutate(() => api.zatca.issueCsid(), "CSID issued");
