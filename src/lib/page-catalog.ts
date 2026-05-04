@@ -43,7 +43,7 @@ export const PAGES: PageDef[] = [
   // Master setup
   { id: "company",          href: "/company",          label: "Company setup",    module: "Master setup" },
   { id: "laboratory",       href: "/laboratory",       label: "Laboratory setup", module: "Master setup" },
-  { id: "user-setup",       href: "/user-setup",       label: "User setup",       module: "Master setup" },
+  { id: "departments",      href: "/departments",      label: "Department setup", module: "Master setup" },
 
   // Admin
   { id: "users",            href: "/users",            label: "Users",            module: "Admin" },
