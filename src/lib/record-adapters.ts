@@ -182,6 +182,7 @@ export interface ApiUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
   role: string;
   department?: string | null;
   isActive: boolean;
@@ -199,6 +200,7 @@ export function userFromApi(u: ApiUser): User {
     id: u.id,
     name: [u.firstName, u.lastName].filter(Boolean).join(" ") || (u.email.split("@")[0] ?? u.email),
     email: u.email,
+    phone: u.phone ?? undefined,
     role: u.role,
     dept: u.department ?? "",
     status: active ? "active" : "inactive",

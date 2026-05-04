@@ -122,7 +122,7 @@ const groups: { title: string; items: NavItem[] }[] = [
         children: [
           { href: "/company",    key: "company",    label: "Company setup",    icon: Building2 },
           { href: "/laboratory", key: "laboratory", label: "Laboratory setup", icon: FlaskConical },
-          { href: "/user-setup", key: "user-setup", label: "User setup",       icon: Users },
+          { href: "/departments", key: "departments", label: "Department setup", icon: UsersRound },
         ],
       },
       {

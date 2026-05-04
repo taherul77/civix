@@ -76,7 +76,7 @@ const ar: Record<string, string> = {
   "New project": "مشروع جديد",
   "New sample": "عينة جديدة",
   "New invoice": "فاتورة جديدة",
-  "Invite user": "دعوة مستخدم",
+  "Add user": "إضافة مستخدم",
   "Register equipment": "تسجيل معدة",
   "Start test": "بدء الاختبار",
 

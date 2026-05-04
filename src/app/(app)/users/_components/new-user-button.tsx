@@ -40,6 +40,7 @@ export function NewUserButton() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
   const [dept, setDept] = useState(DEPTS[0]);
   const [status, setStatus] = useState<User["status"]>("active");
@@ -50,11 +51,11 @@ export function NewUserButton() {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
     const created = await mutate(
-      () => api.users.invite({ name: name.trim(), email: email.trim(), role, dept, status, mfa }),
-      `Invited ${name.trim()}`
+      () => api.users.invite({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, role, dept, status, mfa }),
+      `Added ${name.trim()}`
     );
     if (!created) return;
-    setName(""); setEmail(""); setRole(ROLES[0] ?? ""); setDept(DEPTS[0]);
+    setName(""); setEmail(""); setPhone(""); setRole(ROLES[0] ?? ""); setDept(DEPTS[0]);
     setStatus("active"); setMfa(true);
     setOpen(false);
   };
@@ -67,12 +68,12 @@ export function NewUserButton() {
   return (
     <>
       <button className="btn btn-primary" onClick={() => setOpen(true)}>
-        <Plus className="w-4 h-4" /> {tt("Invite user")}
+        <Plus className="w-4 h-4" /> {tt("Add user")}
       </button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={tt("Invite user")}
+        title={tt("Add user")}
         size="md"
         footer={
           <>
@@ -87,6 +88,9 @@ export function NewUserButton() {
           </Field>
           <Field label={tt("Email")} span={2}>
             <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <Field label={tt("Phone")} span={2}>
+            <input type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+966 5XX XXX XXXX" />
           </Field>
           <Field label={tt("Role")}>
             <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>

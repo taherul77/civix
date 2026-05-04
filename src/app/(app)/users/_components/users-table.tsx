@@ -32,6 +32,7 @@ export function UsersTable() {
             <tr>
               <th>{tt("Name")}</th>
               <th>{tt("Email")}</th>
+              <th>{tt("Phone")}</th>
               <th>{tt("Role")}</th>
               <th>{tt("Department")}</th>
               <th>{tt("MFA")}</th>
@@ -44,6 +45,7 @@ export function UsersTable() {
               <tr key={u.id}>
                 <td className="font-medium">{u.name}</td>
                 <td className="text-sm">{u.email}</td>
+                <td className="text-sm">{u.phone ?? "—"}</td>
                 <td>{u.role}</td>
                 <td>{u.dept}</td>
                 <td>
@@ -82,7 +84,7 @@ export function UsersTable() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center text-sm text-[rgb(var(--muted))] py-8">
+                <td colSpan={8} className="text-center text-sm text-[rgb(var(--muted))] py-8">
                   {tt("No users yet — invite the first one.")}
                 </td>
               </tr>

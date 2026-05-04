@@ -718,6 +718,7 @@ export const users = {
         role:  input.role,
         firstName: first ?? undefined,
         lastName:  rest.length ? rest.join(" ") : undefined,
+        phone: input.phone ?? undefined,
       },
     });
     return userFromApi(row);
@@ -1081,7 +1082,75 @@ export const roles = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Departments (tenant-scoped, used by /departments)
+// ---------------------------------------------------------------------------
+
+export interface ApiDepartment {
+  id: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  manager?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const departments = {
+  async list(): Promise<ApiDepartment[]> {
+    await tick();
+    requireBackend();
+    const out = await apiFetch<{ items: ApiDepartment[] }>("/v1/departments");
+    return out.items;
+  },
+  async get(id: string): Promise<ApiDepartment> {
+    await tick();
+    requireBackend();
+    return apiFetch<ApiDepartment>(`/v1/departments/${encodeURIComponent(id)}`);
+  },
+  async create(input: {
+    name: string;
+    code?: string;
+    description?: string;
+    manager?: string;
+    isActive?: boolean;
+  }): Promise<ApiDepartment> {
+    await tick();
+    requireBackend();
+    return apiFetch<ApiDepartment>("/v1/departments", {
+      method: "POST",
+      body: {
+        name: input.name,
+        code: input.code,
+        description: input.description,
+        manager: input.manager,
+        isActive: input.isActive ?? true,
+      },
+    });
+  },
+  async update(id: string, patch: {
+    name?: string;
+    code?: string;
+    description?: string;
+    manager?: string;
+    isActive?: boolean;
+  }): Promise<ApiDepartment> {
+    await tick();
+    requireBackend();
+    return apiFetch<ApiDepartment>(`/v1/departments/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: patch,
+    });
+  },
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/departments/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+};
+
 // Single-namespace export so call sites read `api.tests.list(...)`.
 export const api = {
-  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles,
+  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles, departments,
 };
