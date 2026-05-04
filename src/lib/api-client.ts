@@ -70,6 +70,14 @@ export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T
     const env = (json && typeof json === "object" && "error" in (json as object))
       ? (json as { error: { code?: string; message?: string; detail?: unknown } }).error
       : null;
+
+    // Auto sign-out on an expired / invalid JWT. Skipped for public routes
+    // (noAuth) and for /v1/auth/* itself so a bad-password 401 doesn't kick
+    // the user out of an in-flight signin.
+    if (res.status === 401 && !opts.noAuth && !path.startsWith("/v1/auth/")) {
+      handleAuthExpired();
+    }
+
     throw new BackendError(
       res.status,
       env?.code ?? "HTTP_" + res.status,
@@ -78,6 +86,22 @@ export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T
     );
   }
   return json as T;
+}
+
+/** Module-scoped guard so a burst of parallel 401s only signs out once. */
+let signingOut = false;
+function handleAuthExpired(): void {
+  if (signingOut) return;
+  if (!useApp.getState().user && !useApp.getState().apiToken) return;
+  signingOut = true;
+  useApp.getState().signOut();
+  if (typeof window !== "undefined") {
+    // Use a hard navigation so any in-flight queries get cancelled along
+    // with the page; the login form will pick up after.
+    window.location.href = "/login";
+  }
+  // Reset the flag after a tick in case the redirect is intercepted.
+  setTimeout(() => { signingOut = false; }, 1000);
 }
 
 function safeJson(text: string): unknown {

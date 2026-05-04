@@ -44,7 +44,6 @@ import {
   otpauthUri,
   verifyTotp,
 } from "@/lib/totp";
-import { verifyChain } from "@/server/audit-chain";
 import { getAdapter, type EquipmentVendor, type EquipmentReading } from "@/server/equipment-adapters";
 import type { EquipmentReadingRecord, EquipmentConnection, InvoiceLineItem } from "@/store/data-store";
 import { issueCsid, signAndClearInvoice, type ZatcaSignableInvoice, type CsidRecord } from "@/lib/zatca";
@@ -88,6 +87,15 @@ import type {
 
 const SIMULATE_LATENCY = false;
 const tick = () => SIMULATE_LATENCY ? new Promise<void>((r) => setTimeout(r, 60)) : Promise.resolve();
+
+// Hard guard: every data endpoint requires a real backend session. There are
+// no in-browser mock fallbacks anymore — pages either show real DB rows or
+// surface this error so the user knows to sign in against the API.
+function requireBackend(): void {
+  if (!isBackendActive()) {
+    throw new Error("Not signed in to the backend — sign in via /login to load data.");
+  }
+}
 
 const locStr = (v: unknown): string => {
   if (typeof v === "string") return v;
@@ -197,54 +205,10 @@ export const auth = {
       // Exactly one membership → enter directly.
       return await this.selectTenant(step1.memberships[0]!.tenantId);
     } catch (err) {
-      // Network failure → fall through to mock path so demo still works.
-      // Auth failures (401/403) bubble up to the caller.
-      if (err instanceof Error && /fetch|Network|Failed/.test(err.message)) {
-        useApp.getState().setApiToken(null, null);
-        // continue to mock
-      } else {
-        useApp.getState().setApiToken(null, null);
-        throw err;
-      }
+      // No mock fallback — every signin must go through the real backend.
+      useApp.getState().setApiToken(null, null);
+      throw err;
     }
-
-    // Offline mock fallback — only reached when the backend was unreachable.
-    // Defaults are applied when the form no longer collects tenant/role.
-    const name = (input.email
-      .split("@")[0] ?? input.email)
-      .split(".")
-      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-      .join(" ");
-    const fallbackRole   = input.role   ?? "Lab Engineer";
-    const fallbackTenant = input.tenant ?? "Demo Lab";
-    const pending = { email: input.email, name, role: fallbackRole, tenant: fallbackTenant };
-
-    // If the user has enrolled MFA, hold the session in `pendingSignIn`
-    // and require a TOTP code. Otherwise complete sign-in immediately.
-    const enrolled = useApp.getState().mfa[input.email];
-    if (enrolled) {
-      useApp.getState().startMfaChallenge(pending);
-      return { kind: "mfa-required", email: input.email, name };
-    }
-
-    useApp.getState().signIn(pending);
-    useData.getState().log({
-      user: `${name} (${fallbackRole})`,
-      email: input.email,
-      action: "login",
-      entity: "session",
-      entityId: input.email,
-    });
-    return {
-      kind: "session",
-      session: {
-        email: input.email,
-        name,
-        role: fallbackRole,
-        tenant: fallbackTenant,
-        permissions: rolePermissions(fallbackRole),
-      },
-    };
   },
 
   /**
@@ -416,60 +380,41 @@ export const auth = {
 export const projects = {
   async list(params: ListProjectsParams = {}): Promise<PagedResponse<ProjectRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiProject[]; total: number }>("/v1/projects", {
-        query: { status: params.status, q: params.q },
-      });
-      return { items: out.items.map(projectFromApi), total: out.total };
-    }
-    requireAuth();
-    const all = useData.getState().projects;
-    const items = all.filter((p) => {
-      if (params.status && params.status !== "all" && p.status !== params.status) return false;
-      if (params.q) {
-        const hay = `${p.code} ${locStr(p.name)} ${locStr(p.client)} ${locStr(p.city)}`.toLowerCase();
-        if (!hay.includes(params.q.toLowerCase())) return false;
-      }
-      return true;
+    requireBackend();
+    const out = await apiFetch<{ items: ApiProject[]; total: number }>("/v1/projects", {
+      query: { status: params.status, q: params.q },
     });
-    return { items, total: items.length };
+    return { items: out.items.map(projectFromApi), total: out.total };
   },
   async get(id: string): Promise<ProjectRecord | null> {
     await tick();
-    if (isBackendActive()) {
-      try {
-        const row = await apiFetch<ApiProject>(`/v1/projects/${id}`);
-        return projectFromApi(row);
-      } catch (e) {
-        if (e instanceof Error && /404/.test((e as { status?: number }).status?.toString() ?? "")) return null;
-        throw e;
-      }
+    requireBackend();
+    try {
+      const row = await apiFetch<ApiProject>(`/v1/projects/${id}`);
+      return projectFromApi(row);
+    } catch (e) {
+      if (e instanceof Error && /404/.test((e as { status?: number }).status?.toString() ?? "")) return null;
+      throw e;
     }
-    requireAuth();
-    return useData.getState().projects.find((p) => p.id === id) ?? null;
   },
   async create(input: CreateProjectInput): Promise<ProjectRecord> {
     await tick();
-    if (isBackendActive()) {
-      const row = await apiFetch<ApiProject>("/v1/projects", {
-        method: "POST",
-        body: {
-          projectCode:  input.code,
-          projectName:  locStr(input.name),
-          clientName:   locStr(input.client),
-          city:         locStr(input.city),
-          engineerName: locStr(input.engineer),
-          startDate:    input.startDate ? new Date(input.startDate).toISOString() : undefined,
-          endDate:      input.endDate   ? new Date(input.endDate).toISOString()   : undefined,
-          contractValue: input.contractValue,
-          status: input.status,
-        },
-      });
-      return projectFromApi(row);
-    }
-    const actor = requirePerm("project:create");
-    const id = useData.getState().addProject(input, actor);
-    return { ...input, id };
+    requireBackend();
+    const row = await apiFetch<ApiProject>("/v1/projects", {
+      method: "POST",
+      body: {
+        projectCode:  input.code,
+        projectName:  locStr(input.name),
+        clientName:   locStr(input.client),
+        city:         locStr(input.city),
+        engineerName: locStr(input.engineer),
+        startDate:    input.startDate ? new Date(input.startDate).toISOString() : undefined,
+        endDate:      input.endDate   ? new Date(input.endDate).toISOString()   : undefined,
+        contractValue: input.contractValue,
+        status: input.status,
+      },
+    });
+    return projectFromApi(row);
   },
 };
 
@@ -480,57 +425,37 @@ export const projects = {
 export const samples = {
   async list(params: ListSamplesParams = {}): Promise<PagedResponse<SampleRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiSample[]; total: number }>("/v1/samples", {
-        query: { type: params.type, projectId: params.projectId, q: params.q },
-      });
-      return { items: out.items.map(sampleFromApi), total: out.total };
-    }
-    requireAuth();
-    const all = useData.getState().samples;
-    const items = all.filter((s) => {
-      if (params.type && params.type !== "all" && s.type !== params.type) return false;
-      if (params.projectId && s.projectId !== params.projectId) return false;
-      if (params.q) {
-        const hay = `${s.code} ${locStr(s.location)} ${locStr(s.sampledBy)}`.toLowerCase();
-        if (!hay.includes(params.q.toLowerCase())) return false;
-      }
-      return true;
+    requireBackend();
+    const out = await apiFetch<{ items: ApiSample[]; total: number }>("/v1/samples", {
+      query: { type: params.type, projectId: params.projectId, q: params.q },
     });
-    return { items, total: items.length };
+    return { items: out.items.map(sampleFromApi), total: out.total };
   },
   async get(id: string): Promise<SampleRecord | null> {
     await tick();
-    if (isBackendActive()) {
-      try { return sampleFromApi(await apiFetch<ApiSample>(`/v1/samples/${id}`)); }
-      catch (e) {
-        if (e instanceof Error && (e as { status?: number }).status === 404) return null;
-        throw e;
-      }
+    requireBackend();
+    try { return sampleFromApi(await apiFetch<ApiSample>(`/v1/samples/${id}`)); }
+    catch (e) {
+      if (e instanceof Error && (e as { status?: number }).status === 404) return null;
+      throw e;
     }
-    requireAuth();
-    return useData.getState().samples.find((s) => s.id === id) ?? null;
   },
   async create(input: CreateSampleInput): Promise<SampleRecord> {
     await tick();
-    if (isBackendActive()) {
-      const row = await apiFetch<ApiSample>("/v1/samples", {
-        method: "POST",
-        body: {
-          projectId:      input.projectId,
-          sampleCode:     input.code,
-          sampleType:     input.type,
-          sampleDate:     new Date(input.date).toISOString(),
-          sampledBy:      locStr(input.sampledBy),
-          sampleLocation: locStr(input.location),
-          status:         input.status === "in_test" ? "in_progress" : input.status,
-        },
-      });
-      return sampleFromApi(row);
-    }
-    const actor = requirePerm("sample:create");
-    const id = useData.getState().addSample(input, actor);
-    return { ...input, id };
+    requireBackend();
+    const row = await apiFetch<ApiSample>("/v1/samples", {
+      method: "POST",
+      body: {
+        projectId:      input.projectId,
+        sampleCode:     input.code,
+        sampleType:     input.type,
+        sampleDate:     new Date(input.date).toISOString(),
+        sampledBy:      locStr(input.sampledBy),
+        sampleLocation: locStr(input.location),
+        status:         input.status === "in_test" ? "in_progress" : input.status,
+      },
+    });
+    return sampleFromApi(row);
   },
 };
 
@@ -541,114 +466,74 @@ export const samples = {
 export const tests = {
   async list(params: ListTestsParams = {}): Promise<PagedResponse<TestRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiTest[]; total: number }>("/v1/tests", {
-        query: { status: params.status, testType: params.category, projectId: params.projectId, sampleId: params.sampleId, q: params.q },
-      });
-      return { items: out.items.map(testFromApi), total: out.total };
-    }
-    requireAuth();
-    const all = useData.getState().tests;
-    const items = all.filter((t) => {
-      if (params.status   && params.status   !== "all" && t.status   !== params.status)   return false;
-      if (params.category && params.category !== "all" && t.category !== params.category) return false;
-      if (params.projectId && t.projectId !== params.projectId) return false;
-      if (params.sampleId && t.sampleId !== params.sampleId) return false;
-      if (params.q) {
-        const hay = `${t.code} ${locStr(t.name)} ${t.standard}`.toLowerCase();
-        if (!hay.includes(params.q.toLowerCase())) return false;
-      }
-      return true;
+    requireBackend();
+    const out = await apiFetch<{ items: ApiTest[]; total: number }>("/v1/tests", {
+      query: { status: params.status, testType: params.category, projectId: params.projectId, sampleId: params.sampleId, q: params.q },
     });
-    return { items, total: items.length };
+    return { items: out.items.map(testFromApi), total: out.total };
   },
 
   async get(id: string): Promise<TestRecord | null> {
     await tick();
-    if (isBackendActive()) {
-      try { return testFromApi(await apiFetch<ApiTest>(`/v1/tests/${id}`)); }
-      catch (e) {
-        if (e instanceof Error && (e as { status?: number }).status === 404) return null;
-        throw e;
-      }
+    requireBackend();
+    try { return testFromApi(await apiFetch<ApiTest>(`/v1/tests/${id}`)); }
+    catch (e) {
+      if (e instanceof Error && (e as { status?: number }).status === 404) return null;
+      throw e;
     }
-    requireAuth();
-    return useData.getState().tests.find((t) => t.id === id) ?? null;
   },
 
   async create(input: CreateTestInput): Promise<TestRecord> {
     await tick();
-    if (isBackendActive()) {
-      const [stdBody, ...stdNum] = (input.standard ?? "").split(" ");
-      const row = await apiFetch<ApiTest>("/v1/tests", {
-        method: "POST",
-        body: {
-          sampleId:       input.sampleId,
-          projectId:      input.projectId,
-          testType:       input.category,
-          testCode:       input.code,
-          standardBody:   stdBody || undefined,
-          standardNumber: stdNum.length ? stdNum.join(" ") : undefined,
-          testDate:       input.testDate ? new Date(input.testDate).toISOString() : undefined,
-          inputData:      {},
-          calculatedResults: input.primaryResult ? { primaryResult: { value: input.primaryResult.value, unit: input.primaryResult.unit, label: locStr(input.primaryResult.label) } } : undefined,
-          passFailStatus: input.passFail === "pass" ? "pass" : input.passFail === "fail" ? "fail" : undefined,
-        },
-      });
-      return testFromApi(row);
-    }
-    const actor = requirePerm("test:create");
-    const id = useData.getState().addTest(input, actor);
-    return { ...input, id };
+    requireBackend();
+    const [stdBody, ...stdNum] = (input.standard ?? "").split(" ");
+    const row = await apiFetch<ApiTest>("/v1/tests", {
+      method: "POST",
+      body: {
+        sampleId:       input.sampleId,
+        projectId:      input.projectId,
+        testType:       input.category,
+        testCode:       input.code,
+        standardBody:   stdBody || undefined,
+        standardNumber: stdNum.length ? stdNum.join(" ") : undefined,
+        testDate:       input.testDate ? new Date(input.testDate).toISOString() : undefined,
+        inputData:      {},
+        calculatedResults: input.primaryResult ? { primaryResult: { value: input.primaryResult.value, unit: input.primaryResult.unit, label: locStr(input.primaryResult.label) } } : undefined,
+        passFailStatus: input.passFail === "pass" ? "pass" : input.passFail === "fail" ? "fail" : undefined,
+      },
+    });
+    return testFromApi(row);
   },
 
   async submit(id: string): Promise<void> {
     await tick();
-    if (isBackendActive()) { await apiFetch(`/v1/tests/${id}/submit`, { method: "POST", body: {} }); return; }
-    const actor = requirePerm("test:submit");
-    const t = useData.getState().tests.find((x) => x.id === id);
-    if (!t) throw errors.notFound("Test", id);
-    if (t.status !== "draft") throw errors.conflict(`Test ${id} cannot be submitted from status "${t.status}"`);
-    useData.getState().submitTestForReview({ testId: id, actor });
+    requireBackend();
+    await apiFetch(`/v1/tests/${id}/submit`, { method: "POST", body: {} });
   },
 
   async review(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    if (isBackendActive()) { await apiFetch(`/v1/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } }); return; }
-    const actor = requirePerm("test:review");
-    const t = useData.getState().tests.find((x) => x.id === id);
-    if (!t) throw errors.notFound("Test", id);
-    if (t.status !== "submitted") throw errors.conflict(`Test ${id} cannot be reviewed from status "${t.status}"`);
-    useData.getState().reviewTest({ testId: id, actor, comment: opts.comment });
+    requireBackend();
+    await apiFetch(`/v1/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } });
   },
 
   async approve(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    if (isBackendActive()) { await apiFetch(`/v1/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } }); return; }
-    const actor = requirePerm("test:approve");
-    const t = useData.getState().tests.find((x) => x.id === id);
-    if (!t) throw errors.notFound("Test", id);
-    if (t.status === "approved") throw errors.conflict(`Test ${id} is already approved.`);
-    useData.getState().approveTest({ testId: id, actor, comment: opts.comment });
+    requireBackend();
+    await apiFetch(`/v1/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } });
   },
 
   async sign(id: string, input: SignInput): Promise<void> {
     await tick();
     if (!input.certificateSerial) throw errors.validation("Certificate serial required for signing");
-    if (isBackendActive()) { await apiFetch(`/v1/tests/${id}/sign`, { method: "POST", body: { certificateSerial: input.certificateSerial } }); return; }
-    const actor = requirePerm("test:sign");
-    const t = useData.getState().tests.find((x) => x.id === id);
-    if (!t) throw errors.notFound("Test", id);
-    useData.getState().signTest({ testId: id, actor, certificateSerial: input.certificateSerial });
+    requireBackend();
+    await apiFetch(`/v1/tests/${id}/sign`, { method: "POST", body: { certificateSerial: input.certificateSerial } });
   },
 
   async reject(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
-    if (isBackendActive()) { await apiFetch(`/v1/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } }); return; }
-    const actor = requirePerm("test:review");
-    const t = useData.getState().tests.find((x) => x.id === id);
-    if (!t) throw errors.notFound("Test", id);
-    useData.getState().rejectTest({ testId: id, actor, comment: opts.comment });
+    requireBackend();
+    await apiFetch(`/v1/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } });
   },
 };
 
@@ -675,82 +560,46 @@ function readingToRecord(r: EquipmentReading): EquipmentReadingRecord {
 export const equipment = {
   async list(): Promise<PagedResponse<EquipmentRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiEquipment[]; total: number }>("/v1/equipment");
-      return { items: out.items.map(equipmentFromApi), total: out.total };
-    }
-    requireAuth();
-    const items = useData.getState().equipment;
-    return { items, total: items.length };
+    requireBackend();
+    const out = await apiFetch<{ items: ApiEquipment[]; total: number }>("/v1/equipment");
+    return { items: out.items.map(equipmentFromApi), total: out.total };
   },
   async create(input: CreateEquipmentInput): Promise<EquipmentRecord> {
     await tick();
-    if (isBackendActive()) {
-      const row = await apiFetch<ApiEquipment>("/v1/equipment", {
-        method: "POST",
-        body: {
-          equipmentCode:      input.code,
-          equipmentName:      locStr(input.name),
-          manufacturer:       input.manufacturer,
-          model:              input.model,
-          serialNumber:       input.serial,
-          calibrationDueDate: input.calibrationDue ? new Date(input.calibrationDue).toISOString() : undefined,
-          status:             input.status,
-        },
-      });
-      return equipmentFromApi(row);
-    }
-    const actor = requirePerm("equipment:create");
-    const id = useData.getState().addEquipment(input, actor);
-    return { ...input, id };
+    requireBackend();
+    const row = await apiFetch<ApiEquipment>("/v1/equipment", {
+      method: "POST",
+      body: {
+        equipmentCode:      input.code,
+        equipmentName:      locStr(input.name),
+        manufacturer:       input.manufacturer,
+        model:              input.model,
+        serialNumber:       input.serial,
+        calibrationDueDate: input.calibrationDue ? new Date(input.calibrationDue).toISOString() : undefined,
+        status:             input.status,
+      },
+    });
+    return equipmentFromApi(row);
   },
 
   /** Persist the integration endpoint + API key for this equipment record. */
   async connect(equipmentId: string, conn: EquipmentConnection): Promise<void> {
     await tick();
-    if (isBackendActive()) {
-      await apiFetch(`/v1/equipment/${equipmentId}/connect`, {
-        method: "POST",
-        body: { vendor: conn.vendor, endpoint: conn.endpoint, apiKey: conn.apiKey },
-      });
-      // Mirror locally so the equipment-adapters layer (which polls in-memory)
-      // continues to work for read-after-write.
-      useData.getState().setEquipmentConnection(equipmentId, conn);
-      return;
-    }
-    const actor = requirePerm("equipment:calibrate");
-    const eq = useData.getState().equipment.find((e) => e.id === equipmentId);
-    if (!eq) throw errors.notFound("Equipment", equipmentId);
-    useData.getState().setEquipmentConnection(equipmentId, conn);
-    useData.getState().log({
-      user: `${actor.name} (${actor.role})`,
-      email: actor.email,
-      action: "update",
-      entity: "equipment",
-      entityId: equipmentId,
-      diff: [{ field: "integration", from: "—", to: `${conn.vendor} @ ${conn.endpoint ?? "(file import)"}` }],
+    requireBackend();
+    await apiFetch(`/v1/equipment/${equipmentId}/connect`, {
+      method: "POST",
+      body: { vendor: conn.vendor, endpoint: conn.endpoint, apiKey: conn.apiKey },
     });
+    // Mirror locally so the equipment-adapters layer (which polls in-memory)
+    // continues to work for read-after-write.
+    useData.getState().setEquipmentConnection(equipmentId, conn);
   },
 
   async disconnect(equipmentId: string): Promise<void> {
     await tick();
-    if (isBackendActive()) {
-      await apiFetch(`/v1/equipment/${equipmentId}/disconnect`, { method: "POST", body: {} });
-      useData.getState().setEquipmentConnection(equipmentId, null);
-      return;
-    }
-    const actor = requirePerm("equipment:calibrate");
-    const eq = useData.getState().equipment.find((e) => e.id === equipmentId);
-    if (!eq) throw errors.notFound("Equipment", equipmentId);
+    requireBackend();
+    await apiFetch(`/v1/equipment/${equipmentId}/disconnect`, { method: "POST", body: {} });
     useData.getState().setEquipmentConnection(equipmentId, null);
-    useData.getState().log({
-      user: `${actor.name} (${actor.role})`,
-      email: actor.email,
-      action: "update",
-      entity: "equipment",
-      entityId: equipmentId,
-      diff: [{ field: "integration", from: "connected", to: "disconnected" }],
-    });
   },
 
   /** Poll the connected adapter for new readings. */
@@ -854,32 +703,52 @@ export const equipment = {
 export const users = {
   async list(): Promise<PagedResponse<UserRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiUser[]; total: number }>("/v1/users");
-      return { items: out.items.map(userFromApi), total: out.total };
-    }
-    requireAuth();
-    const items = useData.getState().users;
-    return { items, total: items.length };
+    requireBackend();
+    const out = await apiFetch<{ items: ApiUser[]; total: number }>("/v1/users");
+    return { items: out.items.map(userFromApi), total: out.total };
   },
   async invite(input: InviteUserInput): Promise<UserRecord> {
     await tick();
-    if (isBackendActive()) {
-      const [first, ...rest] = (input.name ?? "").split(" ");
-      const row = await apiFetch<ApiUser>("/v1/users/invite", {
-        method: "POST",
-        body: {
-          email: input.email,
-          role:  input.role,
-          firstName: first ?? undefined,
-          lastName:  rest.length ? rest.join(" ") : undefined,
-        },
-      });
-      return userFromApi(row);
+    requireBackend();
+    const [first, ...rest] = (input.name ?? "").split(" ");
+    const row = await apiFetch<ApiUser>("/v1/users/invite", {
+      method: "POST",
+      body: {
+        email: input.email,
+        role:  input.role,
+        firstName: first ?? undefined,
+        lastName:  rest.length ? rest.join(" ") : undefined,
+      },
+    });
+    return userFromApi(row);
+  },
+  async update(id: string, patch: {
+    name?: string;
+    role?: string;
+    dept?: string | null;
+    status?: "active" | "inactive";
+  }): Promise<UserRecord> {
+    await tick();
+    requireBackend();
+    const body: Record<string, unknown> = {};
+    if (patch.role !== undefined)   body.role = patch.role;
+    if (patch.dept !== undefined)   body.department = patch.dept;
+    if (patch.status !== undefined) body.isActive = patch.status === "active";
+    if (patch.name !== undefined) {
+      const [first, ...rest] = patch.name.split(" ");
+      body.firstName = first ?? "";
+      body.lastName  = rest.length ? rest.join(" ") : "";
     }
-    const actor = requirePerm("user:invite");
-    const id = useData.getState().addUser(input, actor);
-    return { ...input, id };
+    const row = await apiFetch<ApiUser>(`/v1/users/${encodeURIComponent(id)}/membership`, {
+      method: "PATCH",
+      body,
+    });
+    return userFromApi(row);
+  },
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/users/${encodeURIComponent(id)}/membership`, { method: "DELETE" });
   },
 };
 
@@ -1048,25 +917,11 @@ export const zatca = {
 export const audit = {
   async list(params: ListAuditParams = {}): Promise<PagedResponse<AuditRecord>> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiAudit[]; total: number }>("/v1/audit", {
-        query: { entity: params.entity, q: params.q, limit: params.limit },
-      });
-      return { items: out.items.map(auditFromApi), total: out.total };
-    }
-    const all = useData.getState().audit;
-    let items = all;
-    if (params.entity && params.entity !== "all") {
-      items = items.filter((a) => a.entity === params.entity);
-    }
-    if (params.q) {
-      const q = params.q.toLowerCase();
-      items = items.filter((a) =>
-        `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q)
-      );
-    }
-    if (params.limit) items = items.slice(0, params.limit);
-    return { items, total: items.length };
+    requireBackend();
+    const out = await apiFetch<{ items: ApiAudit[]; total: number }>("/v1/audit", {
+      query: { entity: params.entity, q: params.q, limit: params.limit },
+    });
+    return { items: out.items.map(auditFromApi), total: out.total };
   },
 };
 
@@ -1077,75 +932,29 @@ export const audit = {
 export const dashboard = {
   async stats(): Promise<DashboardStats> {
     await tick();
-    if (isBackendActive()) {
-      const raw = await apiFetch<{
-        testsToday: number; pendingReview: number; approvedThisMonth: number; overdueCalibrations: number;
-        monthlyVolume: { month: string; tests: number; passed: number }[];
-        byCategory: { name: string; value: number }[];
-        passFailByCategory: { category: string; pass: number; fail: number }[];
-        activeProjects: ApiProject[];
-        recentTests: ApiTest[];
-      }>("/v1/dashboard/stats");
-      return {
-        testsToday: raw.testsToday,
-        pendingReview: raw.pendingReview,
-        approvedThisMonth: raw.approvedThisMonth,
-        overdueCalibrations: raw.overdueCalibrations,
-        monthlyVolume: raw.monthlyVolume,
-        byCategory: raw.byCategory,
-        passFailByCategory: raw.passFailByCategory,
-        activeProjects: raw.activeProjects.map(projectFromApi),
-        recentTests: raw.recentTests.map(testFromApi),
-      };
+    // Always go through the backend. If the user isn't signed in against the
+    // real API, surface that — never fabricate hardcoded chart data.
+    if (!isBackendActive()) {
+      throw new Error("Not signed in to the backend — sign in via /login to load dashboard data.");
     }
-    const s = useData.getState();
-    const today = new Date().toISOString().slice(0, 10);
-    const month = today.slice(0, 7);
-
-    const testsToday      = s.tests.filter((t) => t.testDate === today).length;
-    const pendingReview   = s.tests.filter((t) => t.status === "submitted").length;
-    const approvedThisMonth = s.tests.filter(
-      (t) => t.status === "approved" && t.testDate.startsWith(month)
-    ).length;
-    const overdueCalibrations = s.equipment.filter((e) => {
-      const days = Math.round((new Date(e.calibrationDue).getTime() - Date.now()) / 86400000);
-      return days < 0;
-    }).length;
-
+    const raw = await apiFetch<{
+      testsToday: number; pendingReview: number; approvedThisMonth: number; overdueCalibrations: number;
+      monthlyVolume: { month: string; tests: number; passed: number }[];
+      byCategory: { name: string; value: number }[];
+      passFailByCategory: { category: string; pass: number; fail: number }[];
+      activeProjects: ApiProject[];
+      recentTests: ApiTest[];
+    }>("/v1/dashboard/stats");
     return {
-      testsToday: testsToday || 27,
-      pendingReview: pendingReview || 14,
-      approvedThisMonth: approvedThisMonth || 309,
-      overdueCalibrations: overdueCalibrations || 2,
-      monthlyVolume: [
-        { month: "Nov", tests: 184, passed: 171 },
-        { month: "Dec", tests: 212, passed: 198 },
-        { month: "Jan", tests: 246, passed: 229 },
-        { month: "Feb", tests: 288, passed: 271 },
-        { month: "Mar", tests: 304, passed: 282 },
-        { month: "Apr", tests: 327, passed: 309 },
-      ],
-      byCategory: [
-        { name: "Concrete",  value: 142 },
-        { name: "Soil",      value: 78 },
-        { name: "Aggregate", value: 54 },
-        { name: "Asphalt",   value: 31 },
-        { name: "Steel",     value: 22 },
-        { name: "Cement",    value: 17 },
-        { name: "Water",     value: 28 },
-        { name: "Masonry",   value: 9 },
-      ],
-      passFailByCategory: [
-        { category: "Concrete",  pass: 132, fail: 10 },
-        { category: "Soil",      pass: 74,  fail: 4 },
-        { category: "Aggregate", pass: 51,  fail: 3 },
-        { category: "Asphalt",   pass: 29,  fail: 2 },
-        { category: "Steel",     pass: 22,  fail: 0 },
-        { category: "Cement",    pass: 16,  fail: 1 },
-        { category: "Water",     pass: 25,  fail: 3 },
-      ],
-      activeProjects: s.projects.filter((p) => p.status === "active"),
-      recentTests: s.tests.slice(0, 6),
+      testsToday: raw.testsToday,
+      pendingReview: raw.pendingReview,
+      approvedThisMonth: raw.approvedThisMonth,
+      overdueCalibrations: raw.overdueCalibrations,
+      monthlyVolume: raw.monthlyVolume,
+      byCategory: raw.byCategory,
+      passFailByCategory: raw.passFailByCategory,
+      activeProjects: raw.activeProjects.map(projectFromApi),
+      recentTests: raw.recentTests.map(testFromApi),
     };
   },
 };
@@ -1197,69 +1006,23 @@ export const reports = {
   /** Public verification endpoint — used by the QR target route /verify/<id>. */
   async verify(testIdOrReportNumber: string): Promise<VerifyResult> {
     await tick();
-    if (isBackendActive()) {
-      return await apiFetch<VerifyResult>(`/v1/reports/verify/${encodeURIComponent(testIdOrReportNumber)}`, {
-        noAuth: true,
-      });
-    }
-    const s = useData.getState();
-    // Accept either a raw test id, a test code (T-...) or a report number (RPT-...).
-    const test =
-      s.tests.find((t) => t.id === testIdOrReportNumber) ??
-      s.tests.find((t) => t.code === testIdOrReportNumber) ??
-      s.tests.find((t) => reportNumberFor(t.code) === testIdOrReportNumber) ??
-      null;
-
-    if (!test) return { reportNumber: testIdOrReportNumber, found: false };
-
-    const trail = s.audit.filter((a) => a.entity === "test" && a.entityId === test.id);
-    const apvEvt = trail.find((a) => a.action === "approve");
-    const signEvt = trail.find((a) => a.action === "sign");
-    const chain = verifyChain(s.audit);
-
-    return {
-      reportNumber: reportNumberFor(test.code),
-      found: true,
-      testCode: test.code,
-      standard: test.standard,
-      conformity:
-        test.passFail === "pass"
-          ? "conforms"
-          : test.passFail === "fail"
-          ? "does_not_conform"
-          : "pending",
-      signedBy: signEvt?.user ?? null,
-      signatureSerial: signEvt?.diff?.find((d) => d.field === "signature")?.to ?? null,
-      signedAt: signEvt?.ts ?? null,
-      approvedAt: apvEvt?.ts ?? null,
-      chainOk: chain.ok,
-      brokenAt: chain.brokenAt,
-    };
+    // Public endpoint — works without an auth token, but still needs a real
+    // backend reachable at NEXT_PUBLIC_API_URL. We don't use requireBackend()
+    // here because /verify can be called by the public verification page.
+    return await apiFetch<VerifyResult>(`/v1/reports/verify/${encodeURIComponent(testIdOrReportNumber)}`, {
+      noAuth: true,
+    });
   },
 
   /** Record that a report was generated (PDF/Word/Excel) — spec §7 audit. */
   async markGenerated(input: ReportGenerateInput): Promise<{ reportNumber: string }> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ reportNumber: string; reportId: string }>(
-        `/v1/reports/test/${input.testId}/generated`,
-        { method: "POST", body: { format: input.format } }
-      );
-      return { reportNumber: out.reportNumber };
-    }
-    const actor = requirePerm("report:export");
-    const test = useData.getState().tests.find((t) => t.id === input.testId);
-    if (!test) throw errors.notFound("Test", input.testId);
-    const reportNumber = reportNumberFor(test.code);
-    useData.getState().log({
-      user: `${actor.name} (${actor.role})`,
-      email: actor.email,
-      action: "update",
-      entity: "test",
-      entityId: test.id,
-      diff: [{ field: "report", from: "—", to: `${reportNumber} (${input.format})` }],
-    });
-    return { reportNumber };
+    requireBackend();
+    const out = await apiFetch<{ reportNumber: string; reportId: string }>(
+      `/v1/reports/test/${input.testId}/generated`,
+      { method: "POST", body: { format: input.format } }
+    );
+    return { reportNumber: out.reportNumber };
   },
 };
 
@@ -1268,68 +1031,53 @@ export const reports = {
 // ---------------------------------------------------------------------------
 
 export interface ApiRole {
+  id: string;
   name: string;
   permissions: string[];
   isCustom: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const roles = {
-  async list(): Promise<ApiRole[]> {
+  /**
+   * List roles for the current tenant. Super Admin may pass `tenantId` to
+   * inspect any company; everyone else is pinned to their own tenant.
+   */
+  async list(tenantId?: string): Promise<ApiRole[]> {
     await tick();
-    if (isBackendActive()) {
-      const out = await apiFetch<{ items: ApiRole[] }>("/v1/roles");
-      return out.items;
-    }
-    requireAuth();
-    const { customRoles, roleMatrix } = useApp.getState();
-    const builtIn = (await import("@/lib/rbac")).ALL_ROLES;
-    const items: ApiRole[] = builtIn.map((name) => ({
-      name,
-      permissions: roleMatrix[name] ?? rolePermissions(name),
-      isCustom: false,
-    }));
-    for (const r of customRoles) {
-      items.push({ name: r.name, permissions: roleMatrix[r.name] ?? r.perms, isCustom: true });
-    }
-    return items;
+    requireBackend();
+    const out = await apiFetch<{ items: ApiRole[] }>("/v1/roles", {
+      query: tenantId ? { tenantId } : undefined,
+    });
+    return out.items;
   },
-  async create(input: { name: string; permissions?: string[] }): Promise<ApiRole> {
+  async create(input: { name: string; permissions?: string[]; tenantId?: string }): Promise<ApiRole> {
     await tick();
-    if (isBackendActive()) {
-      return apiFetch<ApiRole>("/v1/roles", {
-        method: "POST",
-        body: { name: input.name, permissions: input.permissions ?? [] },
-      });
-    }
-    const actor = requirePerm("security:update");
-    void actor;
-    useApp.getState().addCustomRole(input.name);
-    if (input.permissions) useApp.getState().setRoleMatrix(input.name, input.permissions);
-    return { name: input.name, permissions: input.permissions ?? [], isCustom: true };
+    requireBackend();
+    return apiFetch<ApiRole>("/v1/roles", {
+      method: "POST",
+      body: {
+        name: input.name,
+        permissions: input.permissions ?? [],
+        tenantId: input.tenantId,
+      },
+    });
   },
-  async update(name: string, permissions: string[]): Promise<ApiRole> {
+  async update(id: string, patch: { name?: string; permissions?: string[] }): Promise<ApiRole> {
     await tick();
-    if (isBackendActive()) {
-      return apiFetch<ApiRole>(`/v1/roles/${encodeURIComponent(name)}`, {
-        method: "PUT",
-        body: { permissions },
-      });
-    }
-    const actor = requirePerm("security:update");
-    void actor;
-    useApp.getState().setRoleMatrix(name, permissions);
-    const isCustom = useApp.getState().customRoles.some((r) => r.name === name);
-    return { name, permissions, isCustom };
+    requireBackend();
+    return apiFetch<ApiRole>(`/v1/roles/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: patch,
+    });
   },
-  async remove(name: string): Promise<void> {
+  async remove(id: string): Promise<void> {
     await tick();
-    if (isBackendActive()) {
-      await apiFetch(`/v1/roles/${encodeURIComponent(name)}`, { method: "DELETE" });
-      return;
-    }
-    const actor = requirePerm("security:update");
-    void actor;
-    useApp.getState().removeCustomRole(name);
+    requireBackend();
+    await apiFetch(`/v1/roles/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
 };
 

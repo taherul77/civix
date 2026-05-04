@@ -13,10 +13,11 @@ export const TENANT_ADMIN_ROLE = "Tenant Admin";
 // Built-in role NAMES used to seed each new tenant on first /v1/roles read.
 // They are not enforced anywhere — a tenant can rename or delete any of them
 // (except Tenant Admin / Super Admin).
+// Auto-seeded into the `roles` table for every new tenant. "Super Admin"
+// and "Tenant Admin" are platform-protected (rename / delete blocked).
 export const BUILT_IN_ROLE_TEMPLATES = [
-  "Super Admin","Tenant Admin","Quality Manager","Project Manager",
-  "Lab Engineer","Lab Technician","Field Technician","Reviewer",
-  "Approver","Client","Billing Admin",
+  "Super Admin",
+  "Tenant Admin",
 ] as const;
 
 // Standard CRUD on every resource (`<resource>:read|create|update|delete`)
@@ -57,66 +58,12 @@ const ALL_PERMS_LIST: Permission[] = [
   "security:read","security:update",
 ];
 
+// Super Admin is the only role with a hardcoded permission set.
+// Tenant Admin is handled by rolePermissions() below (always full perms).
+// Every other role lives in the tenant_roles table and is created at
+// runtime by the tenant's admin via Role Management.
 const PERMS: Record<string, Permission[]> = {
-  // Super Admin gets every permission; the requirePerm middleware also
-  // bypasses checks when actor.isSuperAdmin is true so this list is more
-  // documentation than enforcement.
   "Super Admin": ALL_PERMS_LIST,
-  // Tenant Admin manages everything inside their tenant — full CRUD on
-  // company resources, but no platform-level powers (those live on the
-  // Super Admin user flag, not on the role).
-  "Tenant Admin": [
-    "test:read","test:update","test:delete",
-    "sample:read","sample:delete",
-    "project:create","project:read","project:update","project:delete",
-    "equipment:create","equipment:read","equipment:update","equipment:delete","equipment:calibrate",
-    "user:create","user:read","user:update","user:delete","user:invite",
-    "report:read","report:export",
-    "audit:read","audit:export",
-    "billing:create","billing:read","billing:update","billing:delete",
-    "settings:read","settings:update",
-    "whitelabel:read","whitelabel:update",
-    "security:read","security:update",
-  ],
-  "Quality Manager": [
-    "test:read","test:review","test:approve",
-    "sample:read","project:read",
-    "equipment:read",
-    "report:read","report:export",
-    "audit:read","audit:export",
-  ],
-  "Project Manager": [
-    "test:create","test:read","test:update","test:submit",
-    "sample:create","sample:read","sample:update",
-    "project:create","project:read","project:update",
-    "equipment:read","report:read","report:export",
-  ],
-  "Lab Engineer": [
-    "test:create","test:read","test:update","test:submit",
-    "sample:create","sample:read","sample:update",
-    "project:read","equipment:read","equipment:calibrate",
-    "report:read","report:export",
-  ],
-  "Lab Technician": [
-    "test:create","test:read","test:update","test:submit",
-    "sample:create","sample:read",
-    "project:read","equipment:read","report:read",
-  ],
-  "Field Technician": [
-    "sample:create","sample:read","project:read","equipment:read",
-  ],
-  "Reviewer": [
-    "test:read","test:review","sample:read","project:read","report:read",
-  ],
-  "Approver": [
-    "test:read","test:approve","test:sign","sample:read","project:read","report:read","report:export",
-  ],
-  "Client": [
-    "report:read",
-  ],
-  "Billing Admin": [
-    "billing:create","billing:read","billing:update","report:read",
-  ],
 };
 
 export const ALL_PERMISSIONS: Permission[] = ALL_PERMS_LIST;
@@ -125,14 +72,15 @@ export const ALL_PERMISSIONS: Permission[] = ALL_PERMS_LIST;
 // dynamic-roles rollout so older imports still resolve.
 export const ALL_ROLES: readonly string[] = BUILT_IN_ROLE_TEMPLATES;
 
-export function hasPermission(role: string | undefined | null, perm: Permission): boolean {
-  if (!role) return false;
-  return (PERMS[role] ?? []).includes(perm);
-}
-
 export function rolePermissions(role: string | undefined | null): Permission[] {
   if (!role) return [];
   // Tenant Admin always gets every permission, regardless of seed.
   if (role === TENANT_ADMIN_ROLE) return ALL_PERMS_LIST;
   return PERMS[role] ?? [];
+}
+
+export function hasPermission(role: string | undefined | null, perm: Permission): boolean {
+  // Routed through rolePermissions so the Tenant Admin short-circuit is
+  // honored even when "Tenant Admin" isn't in the PERMS map.
+  return rolePermissions(role).includes(perm);
 }

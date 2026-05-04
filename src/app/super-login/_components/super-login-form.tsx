@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Crown, Lock, Mail, Loader2, AlertTriangle } from "lucide-react";
 import { useApp } from "@/store/app-store";
@@ -10,10 +10,31 @@ import type { SessionRecord } from "@/server/contracts";
 
 export function SuperLoginForm() {
   const router = useRouter();
+  const user = useApp((s) => s.user);
   const [email, setEmail] = useState("super@civix.sa");
   const [password, setPassword] = useState("demo1234!");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wait for zustand-persist to rehydrate before deciding whether the user
+  // is already signed in. Without this, a reload of /super-login briefly
+  // shows the form before the persisted session loads.
+  const [hydrated, setHydrated] = useState(() => useApp.persist.hasHydrated());
+  useEffect(() => {
+    setHydrated(useApp.persist.hasHydrated());
+    const unsub = useApp.persist.onFinishHydration(() => setHydrated(true));
+    return () => { unsub(); };
+  }, []);
+
+  // If a Super Admin reloads this page while still signed in, bounce them
+  // straight to /super so they don't have to log in again.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (user?.isSuperAdmin) router.replace("/super");
+    else if (user) router.replace("/dashboard");
+  }, [hydrated, user, router]);
+
+  if (!hydrated || user) return null;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

@@ -54,10 +54,15 @@ export function NewUserButton() {
       `Invited ${name.trim()}`
     );
     if (!created) return;
-    setName(""); setEmail(""); setRole(ROLES[0]); setDept(DEPTS[0]);
+    setName(""); setEmail(""); setRole(ROLES[0] ?? ""); setDept(DEPTS[0]);
     setStatus("active"); setMfa(true);
     setOpen(false);
   };
+
+  // Default the Role select to the first available option once roles load.
+  useEffect(() => {
+    if (!role && ROLES.length > 0) setRole(ROLES[0]);
+  }, [role, ROLES]);
 
   return (
     <>

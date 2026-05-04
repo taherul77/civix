@@ -183,19 +183,25 @@ export interface ApiUser {
   firstName?: string | null;
   lastName?: string | null;
   role: string;
+  department?: string | null;
   isActive: boolean;
+  membershipActive?: boolean;
   mfaEnabled: boolean;
   lastLoginAt?: string | null;
 }
 
 export function userFromApi(u: ApiUser): User {
+  // membershipActive (per-tenant) overrides isActive (global) when present —
+  // a Tenant Admin who deactivates someone for THIS company shouldn't have
+  // to also disable their global account.
+  const active = u.membershipActive ?? u.isActive;
   return {
     id: u.id,
     name: [u.firstName, u.lastName].filter(Boolean).join(" ") || (u.email.split("@")[0] ?? u.email),
     email: u.email,
     role: u.role,
-    dept: "",
-    status: u.isActive ? "active" : "inactive",
+    dept: u.department ?? "",
+    status: active ? "active" : "inactive",
     mfa: u.mfaEnabled,
   };
 }

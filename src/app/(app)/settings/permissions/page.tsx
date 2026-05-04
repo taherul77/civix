@@ -9,6 +9,7 @@ import { useApp } from "@/store/app-store";
 import { toast } from "@/components/ui/toast";
 import { apiFetch, isBackendActive } from "@/lib/api-client";
 import { api } from "@/server/api";
+import { SUPER_ADMIN_ROLE } from "@/lib/rbac";
 import {
   PAGES,
   PAGE_ACTIONS,
@@ -31,26 +32,30 @@ export default function PagePermissionsPage() {
   const stored = useApp((s) => s.pagePermissions);
   const setRolePagePermissions = useApp((s) => s.setRolePagePermissions);
   const resetRolePagePermissions = useApp((s) => s.resetRolePagePermissions);
+  const isSuperAdmin = useApp((s) => s.user?.isSuperAdmin ?? false);
 
   const [roleNames, setRoleNames] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>("");
 
   // Load the tenant's role catalogue from /v1/roles so the picker reflects
   // whatever this tenant has defined (built-in templates + custom roles).
+  // Super Admin role is only visible to actual super-admin users.
   useEffect(() => {
     let cancelled = false;
     api.roles
       .list()
       .then((items) => {
         if (cancelled) return;
-        const names = items.map((r) => r.name);
+        const names = items
+          .map((r) => r.name)
+          .filter((n) => isSuperAdmin || n !== SUPER_ADMIN_ROLE);
         setRoleNames(names);
         const first = names.find((n) => !OWNER_ROLES.includes(n as never)) ?? names[0] ?? "";
         setSelectedRole((cur) => cur || first);
       })
       .catch(() => { /* silent — picker just stays empty */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [isSuperAdmin]);
   const [activeModule, setActiveModule] = useState<string>(PAGE_MODULES[0] ?? "Dashboard");
 
   const isOwner = (OWNER_ROLES as readonly string[]).includes(selectedRole);
@@ -58,6 +63,38 @@ export default function PagePermissionsPage() {
   // Working copy of the matrix for the selected role.
   const [draft, setDraft] = useState<RolePagePermissions>(() => seed(selectedRole, stored));
   const [dirty, setDirty] = useState(false);
+  const hydratePagePermissions = useApp((s) => s.hydratePagePermissions);
+
+  // Pull the live page-permissions matrix from the backend on mount and on
+  // role change so a page reload always reflects what's in the DB rather
+  // than whatever was last persisted to localStorage.
+  useEffect(() => {
+    if (!isBackendActive()) return;
+    let cancelled = false;
+    apiFetch<{
+      items: Array<{ role: string; pageId: string; view: boolean; create: boolean; edit: boolean; delete: boolean }>;
+    }>("/v1/role-permissions")
+      .then((out) => {
+        if (cancelled) return;
+        hydratePagePermissions(out.items);
+        // Re-seed the draft from the fresh server data for the selected role.
+        const next: RolePagePermissions = {};
+        for (const it of out.items) {
+          if (it.role !== selectedRole) continue;
+          next[it.pageId] = {
+            view: it.view, create: it.create, edit: it.edit, delete: it.delete,
+          };
+        }
+        setDraft({ ...defaultRolePermissions(), ...next });
+        setDirty(false);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`Failed to load permissions: ${msg}`);
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole]);
 
   // Re-seed when the selected role changes.
   const onRoleChange = (role: string) => {

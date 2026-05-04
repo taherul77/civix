@@ -16,9 +16,13 @@ export function useActor(): Actor | null {
   return { name: user.name, email: user.email, role: user.role };
 }
 
-/** Hook: returns true if the signed-in user has `perm`. */
+/** Hook: returns true if the signed-in user has `perm`. Super Admin bypasses
+ *  every check so the platform owner always has full access regardless of the
+ *  JWT permissions list or any tenant role customization. */
 export function useCan(perm: Permission): boolean {
   const role = useApp((s) => s.user?.role);
+  const isSuperAdmin = useApp((s) => s.user?.isSuperAdmin ?? false);
+  if (isSuperAdmin) return true;
   return hasPermission(role, perm);
 }
 
