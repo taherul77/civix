@@ -45,7 +45,7 @@ export function UsersTable() {
               <tr key={u.id}>
                 <td className="font-medium">{u.name}</td>
                 <td className="text-sm">{u.email}</td>
-                <td className="text-sm">{u.phone ?? "—"}</td>
+                <td className="text-sm !whitespace-nowrap">{u.phone ?? "—"}</td>
                 <td>
                   <div className="flex flex-wrap gap-1">
                     {(u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : [])).map((r) => (

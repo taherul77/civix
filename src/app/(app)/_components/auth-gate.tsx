@@ -16,8 +16,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const user = useApp((s) => s.user);
   const router = useRouter();
 
-  const [hydrated, setHydrated] = useState(() => useApp.persist.hasHydrated());
+  // Defensive: during Turbopack HMR the `persist` API can momentarily be
+  // missing right after a hot-reload. Treat that as "already hydrated"
+  // rather than crashing the gate — a full reload reattaches it.
+  const [hydrated, setHydrated] = useState(() => useApp.persist?.hasHydrated() ?? true);
   useEffect(() => {
+    if (!useApp.persist) { setHydrated(true); return; }
     setHydrated(useApp.persist.hasHydrated());
     const unsub = useApp.persist.onFinishHydration(() => setHydrated(true));
     return () => { unsub(); };
