@@ -46,7 +46,18 @@ export function UsersTable() {
                 <td className="font-medium">{u.name}</td>
                 <td className="text-sm">{u.email}</td>
                 <td className="text-sm">{u.phone ?? "—"}</td>
-                <td>{u.role}</td>
+                <td>
+                  <div className="flex flex-wrap gap-1">
+                    {(u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : [])).map((r) => (
+                      <span
+                        key={r}
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-[rgb(var(--bg-soft))] border border-[rgb(var(--border))]"
+                      >
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                </td>
                 <td>{u.dept}</td>
                 <td>
                   {(u.mfa || mfa[u.email])
@@ -123,38 +134,67 @@ function EditUserModal({
 }) {
   const tt = useT();
   const [name, setName] = useState(user.name);
-  const [role, setRole] = useState(user.role);
+  // `selectedRoles` is the membership's full role list — multiple selectable.
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(
+    user.roles && user.roles.length > 0 ? user.roles : (user.role ? [user.role] : []),
+  );
   const [dept, setDept] = useState(user.dept);
   const [status, setStatus] = useState<UserRecord["status"]>(user.status);
   const [submitting, setSubmitting] = useState(false);
 
   // Roles fetched from the API so the picker reflects the tenant's catalogue.
-  const [roles, setRoles] = useState<string[]>([]);
+  const [allRoles, setAllRoles] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
     api.roles.list()
       .then((items) => {
         if (cancelled) return;
-        setRoles(items.map((r) => r.name).filter((n) => isSuperAdmin || n !== SUPER_ADMIN_ROLE));
+        setAllRoles(items.map((r) => r.name).filter((n) => isSuperAdmin || n !== SUPER_ADMIN_ROLE));
       })
       .catch(() => { /* silent */ });
     return () => { cancelled = true; };
   }, [isSuperAdmin]);
 
+  // Departments fetched from /v1/departments (active rows only). The user's
+  // current value is preserved as a head option so renamed/inactive
+  // departments don't silently disappear from the dropdown on edit.
+  const [depts, setDepts] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.departments.list()
+      .then((items) => {
+        if (cancelled) return;
+        setDepts(items.filter((d) => d.isActive).map((d) => d.name));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (selectedRoles.length === 0) return;
     setSubmitting(true);
     const out = await mutate(
-      () => api.users.update(user.id, { name, role, dept, status }),
+      () => api.users.update(user.id, { name, roles: selectedRoles, dept, status }),
       tt(`Updated ${user.email}`),
     );
     setSubmitting(false);
     if (out) onSaved();
   };
 
-  const roleOptions = useMemo(
-    () => (roles.includes(role) ? roles : [role, ...roles]),
-    [roles, role],
+  const toggleRole = (r: string) => {
+    setSelectedRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
+  };
+
+  // Show the full known catalogue plus any roles the user already has that
+  // aren't in it (e.g. a role that was renamed since invite).
+  const roleOptions = useMemo(() => {
+    const extra = selectedRoles.filter((r) => !allRoles.includes(r));
+    return [...extra, ...allRoles];
+  }, [allRoles, selectedRoles]);
+  const deptOptions = useMemo(
+    () => (dept && !depts.includes(dept) ? [dept, ...depts] : depts),
+    [depts, dept],
   );
 
   return (
@@ -181,13 +221,29 @@ function EditUserModal({
         <Field label={tt("Email")} span={2}>
           <input className="input" value={user.email} disabled />
         </Field>
-        <Field label={tt("Role")}>
-          <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
+        <Field label={tt("Roles")} span={2}>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-3 rounded border border-[rgb(var(--border))] bg-[rgb(var(--bg-soft))]">
+            {roleOptions.length === 0 && (
+              <span className="text-xs text-[rgb(var(--muted))] italic">{tt("Loading…")}</span>
+            )}
+            {roleOptions.map((r) => (
+              <label key={r} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedRoles.includes(r)}
+                  onChange={() => toggleRole(r)}
+                />
+                <span>{r}</span>
+              </label>
+            ))}
+          </div>
+          <p className="help mt-1">{tt("Select one or more — permissions resolve to the union across all assigned roles.")}</p>
         </Field>
         <Field label={tt("Department")}>
-          <input className="input" value={dept} onChange={(e) => setDept(e.target.value)} />
+          <select className="input" value={dept} onChange={(e) => setDept(e.target.value)}>
+            {deptOptions.length === 0 && <option value="">—</option>}
+            {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
         </Field>
         <Field label={tt("Status")} span={2}>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as UserRecord["status"])}>

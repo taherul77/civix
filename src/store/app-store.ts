@@ -15,7 +15,12 @@ type Theme = "light" | "dark";
 interface SessionUser {
   email: string;
   name: string;
+  /** Primary (first) role — kept for display/back-compat. Permissions are
+   *  carried separately in `permissions[]` and resolve to the union across
+   *  every role on this membership. */
   role: string;
+  /** Full list of roles assigned to this user in the current tenant. */
+  roles?: string[];
   tenant: string;
   isSuperAdmin?: boolean;
 }

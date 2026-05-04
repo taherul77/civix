@@ -183,7 +183,11 @@ export interface ApiUser {
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
+  /** Primary role — convenience field. Older endpoints set this only;
+   *  newer ones also send `roles[]`. */
   role: string;
+  /** Full list of roles assigned to this membership. */
+  roles?: string[] | null;
   department?: string | null;
   isActive: boolean;
   membershipActive?: boolean;
@@ -196,12 +200,14 @@ export function userFromApi(u: ApiUser): User {
   // a Tenant Admin who deactivates someone for THIS company shouldn't have
   // to also disable their global account.
   const active = u.membershipActive ?? u.isActive;
+  const roles = (u.roles && u.roles.length > 0) ? u.roles : (u.role ? [u.role] : []);
   return {
     id: u.id,
     name: [u.firstName, u.lastName].filter(Boolean).join(" ") || (u.email.split("@")[0] ?? u.email),
     email: u.email,
     phone: u.phone ?? undefined,
-    role: u.role,
+    role: roles[0] ?? "",
+    roles,
     dept: u.department ?? "",
     status: active ? "active" : "inactive",
     mfa: u.mfaEnabled,

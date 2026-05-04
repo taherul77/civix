@@ -8,6 +8,13 @@ import { Modal, Field } from "@/components/ui/modal";
 import { api, type ApiDepartment } from "@/server/api";
 import { mutate } from "@/server/mutate";
 
+function formatDateTime(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
 export function DepartmentsTable() {
   const tt = useT();
   const canEdit = useCan("settings:update");
@@ -35,9 +42,10 @@ export function DepartmentsTable() {
             <tr>
               <th>{tt("Name")}</th>
               <th>{tt("Code")}</th>
-              <th>{tt("Manager")}</th>
               <th>{tt("Description")}</th>
               <th>{tt("Status")}</th>
+              <th>{tt("Created")}</th>
+              <th>{tt("Updated")}</th>
               <th className="text-right">{tt("Actions")}</th>
             </tr>
           </thead>
@@ -45,13 +53,20 @@ export function DepartmentsTable() {
             {items.map((d) => (
               <tr key={d.id}>
                 <td className="font-medium">{d.name}</td>
-                <td className="text-sm font-mono">{d.code ?? "—"}</td>
-                <td className="text-sm">{d.manager ?? "—"}</td>
+                <td className="text-sm font-mono">{d.code}</td>
                 <td className="text-sm text-[rgb(var(--muted))]">{d.description ?? "—"}</td>
                 <td>
                   {d.isActive
                     ? <span className="badge badge-pass">{tt("Active")}</span>
                     : <span className="badge badge-warn">{tt("Inactive")}</span>}
+                </td>
+                <td className="text-xs">
+                  <div>{formatDateTime(d.createdAt)}</div>
+                  {d.createdBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.createdBy}</div>}
+                </td>
+                <td className="text-xs">
+                  <div>{formatDateTime(d.updatedAt)}</div>
+                  {d.updatedBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.updatedBy}</div>}
                 </td>
                 <td className="text-right">
                   <div className="inline-flex items-center gap-1">
@@ -89,14 +104,14 @@ export function DepartmentsTable() {
             ))}
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center text-sm text-[rgb(var(--muted))] py-8">
+                <td colSpan={7} className="text-center text-sm text-[rgb(var(--muted))] py-8">
                   {tt("No departments yet — add the first one.")}
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={6} className="text-center text-sm text-[rgb(var(--muted))] py-8">
+                <td colSpan={7} className="text-center text-sm text-[rgb(var(--muted))] py-8">
                   {tt("Loading…")}
                 </td>
               </tr>
@@ -141,10 +156,18 @@ function ViewDepartmentModal({ dept, onClose }: { dept: ApiDepartment; onClose: 
     >
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         <div><dt className="help">{tt("Name")}</dt><dd className="font-medium">{dept.name}</dd></div>
-        <div><dt className="help">{tt("Code")}</dt><dd className="font-mono">{dept.code ?? "—"}</dd></div>
-        <div><dt className="help">{tt("Manager")}</dt><dd>{dept.manager ?? "—"}</dd></div>
-        <div><dt className="help">{tt("Status")}</dt><dd>{dept.isActive ? tt("Active") : tt("Inactive")}</dd></div>
+        <div><dt className="help">{tt("Code")}</dt><dd className="font-mono">{dept.code}</dd></div>
         <div className="md:col-span-2"><dt className="help">{tt("Description")}</dt><dd>{dept.description ?? "—"}</dd></div>
+        <div><dt className="help">{tt("Status")}</dt><dd>{dept.isActive ? tt("Active") : tt("Inactive")}</dd></div>
+        <div />
+        <div>
+          <dt className="help">{tt("Created")}</dt>
+          <dd>{formatDateTime(dept.createdAt)}{dept.createdBy ? ` ${tt("by")} ${dept.createdBy}` : ""}</dd>
+        </div>
+        <div>
+          <dt className="help">{tt("Updated")}</dt>
+          <dd>{formatDateTime(dept.updatedAt)}{dept.updatedBy ? ` ${tt("by")} ${dept.updatedBy}` : ""}</dd>
+        </div>
       </dl>
     </Modal>
   );
@@ -159,8 +182,6 @@ function EditDepartmentModal({
 }) {
   const tt = useT();
   const [name, setName] = useState(dept.name);
-  const [code, setCode] = useState(dept.code ?? "");
-  const [manager, setManager] = useState(dept.manager ?? "");
   const [description, setDescription] = useState(dept.description ?? "");
   const [isActive, setIsActive] = useState(dept.isActive);
   const [submitting, setSubmitting] = useState(false);
@@ -172,8 +193,6 @@ function EditDepartmentModal({
     const out = await mutate(
       () => api.departments.update(dept.id, {
         name: name.trim(),
-        code: code.trim() || undefined,
-        manager: manager.trim() || undefined,
         description: description.trim() || undefined,
         isActive,
       }),
@@ -200,25 +219,32 @@ function EditDepartmentModal({
         </>
       }
     >
-      <form id="edit-dept-form" onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label={tt("Name")} span={2}>
+      <form id="edit-dept-form" onSubmit={submit} className="grid grid-cols-1 gap-4">
+        <Field label={tt("Code")}>
+          <input className="input font-mono" value={dept.code} disabled />
+        </Field>
+        <Field label={tt("Name")}>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
-        <Field label={tt("Code")}>
-          <input className="input" value={code} onChange={(e) => setCode(e.target.value)} />
-        </Field>
-        <Field label={tt("Manager")}>
-          <input className="input" value={manager} onChange={(e) => setManager(e.target.value)} />
-        </Field>
-        <Field label={tt("Description")} span={2}>
+        <Field label={tt("Description")}>
           <textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
-        <Field label={tt("Status")} span={2}>
+        <Field label={tt("Status")}>
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
             <span className="text-sm">{tt("Active")}</span>
           </label>
         </Field>
+        <div className="text-xs text-[rgb(var(--muted))] grid grid-cols-1 md:grid-cols-2 gap-2 pt-2 border-t border-[rgb(var(--border))]">
+          <div>
+            <div className="help">{tt("Created")}</div>
+            <div>{formatDateTime(dept.createdAt)}{dept.createdBy ? ` ${tt("by")} ${dept.createdBy}` : ""}</div>
+          </div>
+          <div>
+            <div className="help">{tt("Updated")}</div>
+            <div>{formatDateTime(dept.updatedAt)}{dept.updatedBy ? ` ${tt("by")} ${dept.updatedBy}` : ""}</div>
+          </div>
+        </div>
       </form>
     </Modal>
   );

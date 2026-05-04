@@ -13,8 +13,6 @@ export function NewDepartmentButton() {
   const canCreate = useCan("settings:update");
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [manager, setManager] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -28,8 +26,6 @@ export function NewDepartmentButton() {
     const created = await mutate(
       () => api.departments.create({
         name: name.trim(),
-        code: code.trim() || undefined,
-        manager: manager.trim() || undefined,
         description: description.trim() || undefined,
         isActive,
       }),
@@ -37,7 +33,7 @@ export function NewDepartmentButton() {
     );
     setSubmitting(false);
     if (!created) return;
-    setName(""); setCode(""); setManager(""); setDescription(""); setIsActive(true);
+    setName(""); setDescription(""); setIsActive(true);
     setOpen(false);
     if (typeof window !== "undefined") window.location.reload();
   };
@@ -63,25 +59,22 @@ export function NewDepartmentButton() {
           </>
         }
       >
-        <form id="new-dept-form" onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label={tt("Name")} span={2}>
+        <form id="new-dept-form" onSubmit={submit} className="grid grid-cols-1 gap-4">
+          <Field label={tt("Name")}>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
           </Field>
-          <Field label={tt("Code")}>
-            <input className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CONC" />
-          </Field>
-          <Field label={tt("Manager")}>
-            <input className="input" value={manager} onChange={(e) => setManager(e.target.value)} />
-          </Field>
-          <Field label={tt("Description")} span={2}>
+          <Field label={tt("Description")}>
             <textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
-          <Field label={tt("Status")} span={2}>
+          <Field label={tt("Status")}>
             <label className="inline-flex items-center gap-2">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               <span className="text-sm">{tt("Active")}</span>
             </label>
           </Field>
+          <p className="help">
+            {tt("A unique department code will be generated automatically.")}
+          </p>
         </form>
       </Modal>
     </>

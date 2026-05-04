@@ -13,7 +13,12 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  /** Primary (first) role — convenience accessor for display. The full
+   *  list is in `roles`. */
   role: string;
+  /** Every role assigned to this user in the current tenant. Permissions
+   *  resolve to the union across all entries. */
+  roles: string[];
   dept: string;
   status: "active" | "inactive";
   mfa: boolean;

@@ -11,8 +11,6 @@ import { useCan } from "@/lib/auth-context";
 import { useApp } from "@/store/app-store";
 import { SUPER_ADMIN_ROLE } from "@/lib/rbac";
 
-const DEPTS = ["Concrete", "Soil", "Aggregate", "Asphalt", "Steel", "Cement", "Quality", "Field"];
-
 export function NewUserButton() {
   const tt = useT();
   const canInvite = useCan("user:invite");
@@ -37,33 +35,67 @@ export function NewUserButton() {
     [allRoles, isSuperAdmin],
   );
 
+  // Departments fetched from /v1/departments for this tenant. Inactive
+  // departments are hidden from the picker so new users can only land on
+  // an active one.
+  const [DEPTS, setDepts] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.departments
+      .list()
+      .then((items) => {
+        if (cancelled) return;
+        setDepts(items.filter((d) => d.isActive).map((d) => d.name));
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState("");
-  const [dept, setDept] = useState(DEPTS[0]);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [dept, setDept] = useState("");
   const [status, setStatus] = useState<User["status"]>("active");
   const [mfa, setMfa] = useState(true);
   if (!canInvite) return null;
 
+  const toggleRole = (r: string) => {
+    setRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    if (!name.trim() || !email.trim() || roles.length === 0) return;
     const created = await mutate(
-      () => api.users.invite({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, role, dept, status, mfa }),
+      () => api.users.invite({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        role: roles[0] ?? "",
+        roles,
+        dept,
+        status,
+        mfa,
+      }),
       `Added ${name.trim()}`
     );
     if (!created) return;
-    setName(""); setEmail(""); setPhone(""); setRole(ROLES[0] ?? ""); setDept(DEPTS[0]);
+    setName(""); setEmail(""); setPhone("");
+    setRoles(ROLES.length > 0 ? [ROLES[0]!] : []);
+    setDept(DEPTS[0] ?? "");
     setStatus("active"); setMfa(true);
     setOpen(false);
   };
 
-  // Default the Role select to the first available option once roles load.
+  // Default to the first role and department once their lists load.
   useEffect(() => {
-    if (!role && ROLES.length > 0) setRole(ROLES[0]);
-  }, [role, ROLES]);
+    if (roles.length === 0 && ROLES.length > 0) setRoles([ROLES[0]!]);
+  }, [roles, ROLES]);
+  useEffect(() => {
+    if (!dept && DEPTS.length > 0) setDept(DEPTS[0]);
+  }, [dept, DEPTS]);
 
   return (
     <>
@@ -92,10 +124,23 @@ export function NewUserButton() {
           <Field label={tt("Phone")} span={2}>
             <input type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+966 5XX XXX XXXX" />
           </Field>
-          <Field label={tt("Role")}>
-            <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+          <Field label={tt("Roles")} span={2}>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-3 rounded border border-[rgb(var(--border))] bg-[rgb(var(--bg-soft))]">
+              {ROLES.length === 0 && (
+                <span className="text-xs text-[rgb(var(--muted))] italic">{tt("Loading…")}</span>
+              )}
+              {ROLES.map((r) => (
+                <label key={r} className="inline-flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={roles.includes(r)}
+                    onChange={() => toggleRole(r)}
+                  />
+                  <span>{r}</span>
+                </label>
+              ))}
+            </div>
+            <p className="help mt-1">{tt("Select one or more — permissions resolve to the union across all assigned roles.")}</p>
           </Field>
           <Field label={tt("Department")}>
             <select className="input" value={dept} onChange={(e) => setDept(e.target.value)}>

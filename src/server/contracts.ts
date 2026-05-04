@@ -25,7 +25,10 @@ export type AuditRecord    = AuditEntry;
 export interface SessionRecord {
   email: string;
   name: string;
+  /** Primary role for display. Use `roles` to enumerate the full set. */
   role: Role | string;
+  /** Every role assigned to the user in the active tenant. */
+  roles?: string[];
   tenant: string;
   permissions: Permission[];
 }
@@ -101,7 +104,9 @@ export interface MembershipChoice {
   tenantName: string;
   subdomain: string;
   logoUrl?: string | null;
+  /** Primary role for the picker label. Full set is in `roles`. */
   role: string;
+  roles?: string[];
   department?: string | null;
 }
 

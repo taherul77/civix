@@ -150,7 +150,8 @@ export const auth = {
               tenantName: string;
               subdomain: string;
               logoUrl: string | null;
-              role: string;
+              role?: string;
+              roles?: string[];
               department: string | null;
             }>;
           }
@@ -196,7 +197,8 @@ export const auth = {
             tenantName: m.tenantName,
             subdomain:  m.subdomain,
             logoUrl:    m.logoUrl,
-            role:       m.role,
+            role:       m.roles?.[0] ?? m.role ?? "",
+            roles:      m.roles ?? (m.role ? [m.role] : []),
             department: m.department,
           })),
         };
@@ -219,7 +221,7 @@ export const auth = {
   async selectTenant(tenantId: string): Promise<MfaSignInResult> {
     const out = await apiFetch<{
       token: string;
-      session: { email: string; name: string; role: string; tenant: string; permissions: string[]; mfaRequired: boolean; isSuperAdmin?: boolean };
+      session: { email: string; name: string; role: string; roles?: string[]; tenant: string; permissions: string[]; mfaRequired: boolean; isSuperAdmin?: boolean };
     }>("/v1/auth/select-tenant", {
       method: "POST",
       body: { tenantId },
@@ -229,6 +231,7 @@ export const auth = {
       email: out.session.email,
       name: out.session.name || out.session.email.split("@")[0],
       role: out.session.role,
+      roles: out.session.roles ?? (out.session.role ? [out.session.role] : []),
       tenant: out.session.tenant,
       permissions: out.session.permissions as SessionRecord["permissions"],
     };
@@ -237,6 +240,7 @@ export const auth = {
       email: session.email,
       name: session.name,
       role: session.role,
+      roles: session.roles,
       tenant: session.tenant,
       isSuperAdmin: !!out.session.isSuperAdmin,
     });
@@ -711,11 +715,16 @@ export const users = {
     await tick();
     requireBackend();
     const [first, ...rest] = (input.name ?? "").split(" ");
+    // Prefer the canonical roles[] payload; fall back to the legacy single
+    // role field so older callers that still pass `role` keep working.
+    const roles = input.roles && input.roles.length > 0
+      ? input.roles
+      : (input.role ? [input.role] : []);
     const row = await apiFetch<ApiUser>("/v1/users/invite", {
       method: "POST",
       body: {
         email: input.email,
-        role:  input.role,
+        roles,
         firstName: first ?? undefined,
         lastName:  rest.length ? rest.join(" ") : undefined,
         phone: input.phone ?? undefined,
@@ -726,13 +735,15 @@ export const users = {
   async update(id: string, patch: {
     name?: string;
     role?: string;
+    roles?: string[];
     dept?: string | null;
     status?: "active" | "inactive";
   }): Promise<UserRecord> {
     await tick();
     requireBackend();
     const body: Record<string, unknown> = {};
-    if (patch.role !== undefined)   body.role = patch.role;
+    if (patch.roles !== undefined) body.roles = patch.roles;
+    else if (patch.role !== undefined) body.roles = [patch.role];
     if (patch.dept !== undefined)   body.department = patch.dept;
     if (patch.status !== undefined) body.isActive = patch.status === "active";
     if (patch.name !== undefined) {
@@ -1089,10 +1100,12 @@ export const roles = {
 export interface ApiDepartment {
   id: string;
   name: string;
-  code?: string | null;
+  /** Server-generated. The client never sets or edits this. */
+  code: string;
   description?: string | null;
-  manager?: string | null;
   isActive: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1111,9 +1124,7 @@ export const departments = {
   },
   async create(input: {
     name: string;
-    code?: string;
     description?: string;
-    manager?: string;
     isActive?: boolean;
   }): Promise<ApiDepartment> {
     await tick();
@@ -1122,18 +1133,14 @@ export const departments = {
       method: "POST",
       body: {
         name: input.name,
-        code: input.code,
         description: input.description,
-        manager: input.manager,
         isActive: input.isActive ?? true,
       },
     });
   },
   async update(id: string, patch: {
     name?: string;
-    code?: string;
     description?: string;
-    manager?: string;
     isActive?: boolean;
   }): Promise<ApiDepartment> {
     await tick();
