@@ -64,7 +64,7 @@ export function CompanyForm() {
           setError("Backend offline — sign in against the API to load company settings.");
           return;
         }
-        const t = await apiFetch<TenantPayload>("/v1/tenant");
+        const t = await apiFetch<TenantPayload>("/v1/master-setup/tenant");
         if (!cancelled) hydrate(t);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load tenant");
@@ -81,7 +81,7 @@ export function CompanyForm() {
     if (!tenant) return;
     setSaving(true);
     const updated = await mutate(
-      () => apiFetch<TenantPayload>("/v1/tenant", {
+      () => apiFetch<TenantPayload>("/v1/master-setup/tenant", {
         method: "PATCH",
         body: {
           name: name.trim(),

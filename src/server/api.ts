@@ -252,7 +252,7 @@ export const auth = {
     try {
       const perms = await apiFetch<{
         items: Array<{ role: string; pageId: string; view: boolean; create: boolean; edit: boolean; delete: boolean }>;
-      }>("/v1/role-permissions");
+      }>("/v1/admin/role-permissions");
       useApp.getState().hydratePagePermissions(perms.items);
     } catch {
       // ignore — defaults will apply
@@ -387,7 +387,7 @@ export const projects = {
   async list(params: ListProjectsParams = {}): Promise<PagedResponse<ProjectRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiProject[]; total: number }>("/v1/projects", {
+    const out = await apiFetch<{ items: ApiProject[]; total: number }>("/v1/operations/projects", {
       query: { status: params.status, q: params.q },
     });
     return { items: out.items.map(projectFromApi), total: out.total };
@@ -396,7 +396,7 @@ export const projects = {
     await tick();
     requireBackend();
     try {
-      const row = await apiFetch<ApiProject>(`/v1/projects/${id}`);
+      const row = await apiFetch<ApiProject>(`/v1/operations/projects/${id}`);
       return projectFromApi(row);
     } catch (e) {
       if (e instanceof Error && /404/.test((e as { status?: number }).status?.toString() ?? "")) return null;
@@ -406,10 +406,12 @@ export const projects = {
   async create(input: CreateProjectInput): Promise<ProjectRecord> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiProject>("/v1/projects", {
+    const row = await apiFetch<ApiProject>("/v1/operations/projects", {
       method: "POST",
       body: {
-        projectCode:  input.code,
+        // Omit projectCode when blank so the backend auto-generates the
+        // tenant-scoped PRJ-YYYY-NNN sequence.
+        ...(input.code ? { projectCode: input.code } : {}),
         projectName:  locStr(input.name),
         clientName:   locStr(input.client),
         clientEmail:  input.clientEmail ?? undefined,
@@ -425,7 +427,7 @@ export const projects = {
     return projectFromApi(row);
   },
 
-  /** PATCH /v1/projects/:id — only the provided fields are sent. */
+  /** PATCH /v1/operations/projects/:id — only the provided fields are sent. */
   async update(id: string, patch: UpdateProjectInput): Promise<ProjectRecord> {
     await tick();
     requireBackend();
@@ -440,7 +442,7 @@ export const projects = {
     if (patch.endDate     !== undefined) body.endDate       = patch.endDate   ? new Date(patch.endDate).toISOString()   : null;
     if (patch.contractValue !== undefined) body.contractValue = patch.contractValue;
     if (patch.status      !== undefined) body.status        = patch.status;
-    const row = await apiFetch<ApiProject>(`/v1/projects/${encodeURIComponent(id)}`, {
+    const row = await apiFetch<ApiProject>(`/v1/operations/projects/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body,
     });
@@ -448,11 +450,11 @@ export const projects = {
     return projectFromApi(row);
   },
 
-  /** DELETE /v1/projects/:id */
+  /** DELETE /v1/operations/projects/:id */
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await apiFetch(`/v1/operations/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
     invalidate("projects", "samples", "tests", "dashboard");
   },
 };
@@ -465,7 +467,7 @@ export const samples = {
   async list(params: ListSamplesParams = {}): Promise<PagedResponse<SampleRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiSample[]; total: number }>("/v1/samples", {
+    const out = await apiFetch<{ items: ApiSample[]; total: number }>("/v1/operations/samples", {
       query: { type: params.type, projectId: params.projectId, q: params.q },
     });
     return { items: out.items.map(sampleFromApi), total: out.total };
@@ -473,7 +475,7 @@ export const samples = {
   async get(id: string): Promise<SampleRecord | null> {
     await tick();
     requireBackend();
-    try { return sampleFromApi(await apiFetch<ApiSample>(`/v1/samples/${id}`)); }
+    try { return sampleFromApi(await apiFetch<ApiSample>(`/v1/operations/samples/${id}`)); }
     catch (e) {
       if (e instanceof Error && (e as { status?: number }).status === 404) return null;
       throw e;
@@ -482,7 +484,7 @@ export const samples = {
   async create(input: CreateSampleInput): Promise<SampleRecord> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiSample>("/v1/samples", {
+    const row = await apiFetch<ApiSample>("/v1/operations/samples", {
       method: "POST",
       body: {
         projectId:      input.projectId,
@@ -507,7 +509,7 @@ export const tests = {
   async list(params: ListTestsParams = {}): Promise<PagedResponse<TestRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiTest[]; total: number }>("/v1/tests", {
+    const out = await apiFetch<{ items: ApiTest[]; total: number }>("/v1/operations/tests", {
       query: { status: params.status, testType: params.category, projectId: params.projectId, sampleId: params.sampleId, q: params.q },
     });
     return { items: out.items.map(testFromApi), total: out.total };
@@ -516,7 +518,7 @@ export const tests = {
   async get(id: string): Promise<TestRecord | null> {
     await tick();
     requireBackend();
-    try { return testFromApi(await apiFetch<ApiTest>(`/v1/tests/${id}`)); }
+    try { return testFromApi(await apiFetch<ApiTest>(`/v1/operations/tests/${id}`)); }
     catch (e) {
       if (e instanceof Error && (e as { status?: number }).status === 404) return null;
       throw e;
@@ -527,7 +529,7 @@ export const tests = {
     await tick();
     requireBackend();
     const [stdBody, ...stdNum] = (input.standard ?? "").split(" ");
-    const row = await apiFetch<ApiTest>("/v1/tests", {
+    const row = await apiFetch<ApiTest>("/v1/operations/tests", {
       method: "POST",
       body: {
         sampleId:       input.sampleId,
@@ -549,21 +551,21 @@ export const tests = {
   async submit(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/tests/${id}/submit`, { method: "POST", body: {} });
+    await apiFetch(`/v1/operations/tests/${id}/submit`, { method: "POST", body: {} });
     invalidate("tests", "audit", "dashboard");
   },
 
   async review(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } });
+    await apiFetch(`/v1/operations/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } });
     invalidate("tests", "audit", "dashboard");
   },
 
   async approve(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } });
+    await apiFetch(`/v1/operations/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } });
     invalidate("tests", "audit", "dashboard");
   },
 
@@ -571,14 +573,14 @@ export const tests = {
     await tick();
     if (!input.certificateSerial) throw errors.validation("Certificate serial required for signing");
     requireBackend();
-    await apiFetch(`/v1/tests/${id}/sign`, { method: "POST", body: { certificateSerial: input.certificateSerial } });
+    await apiFetch(`/v1/operations/tests/${id}/sign`, { method: "POST", body: { certificateSerial: input.certificateSerial } });
     invalidate("tests", "audit", "dashboard");
   },
 
   async reject(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } });
+    await apiFetch(`/v1/operations/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } });
     invalidate("tests", "audit", "dashboard");
   },
 };
@@ -607,13 +609,13 @@ export const equipment = {
   async list(): Promise<PagedResponse<EquipmentRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiEquipment[]; total: number }>("/v1/equipment");
+    const out = await apiFetch<{ items: ApiEquipment[]; total: number }>("/v1/lab/equipment");
     return { items: out.items.map(equipmentFromApi), total: out.total };
   },
   async create(input: CreateEquipmentInput): Promise<EquipmentRecord> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiEquipment>("/v1/equipment", {
+    const row = await apiFetch<ApiEquipment>("/v1/lab/equipment", {
       method: "POST",
       body: {
         equipmentCode:      input.code,
@@ -633,7 +635,7 @@ export const equipment = {
   async connect(equipmentId: string, conn: EquipmentConnection): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/equipment/${equipmentId}/connect`, {
+    await apiFetch(`/v1/lab/equipment/${equipmentId}/connect`, {
       method: "POST",
       body: { vendor: conn.vendor, endpoint: conn.endpoint, apiKey: conn.apiKey },
     });
@@ -645,7 +647,7 @@ export const equipment = {
   async disconnect(equipmentId: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/equipment/${equipmentId}/disconnect`, { method: "POST", body: {} });
+    await apiFetch(`/v1/lab/equipment/${equipmentId}/disconnect`, { method: "POST", body: {} });
     useData.getState().setEquipmentConnection(equipmentId, null);
   },
 
@@ -751,7 +753,7 @@ export const users = {
   async list(): Promise<PagedResponse<UserRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiUser[]; total: number }>("/v1/users");
+    const out = await apiFetch<{ items: ApiUser[]; total: number }>("/v1/admin/users");
     return { items: out.items.map(userFromApi), total: out.total };
   },
   async invite(input: InviteUserInput): Promise<UserRecord> {
@@ -763,7 +765,7 @@ export const users = {
     const roles = input.roles && input.roles.length > 0
       ? input.roles
       : (input.role ? [input.role] : []);
-    const row = await apiFetch<ApiUser>("/v1/users/invite", {
+    const row = await apiFetch<ApiUser>("/v1/admin/users/invite", {
       method: "POST",
       body: {
         email: input.email,
@@ -795,7 +797,7 @@ export const users = {
       body.firstName = first ?? "";
       body.lastName  = rest.length ? rest.join(" ") : "";
     }
-    const row = await apiFetch<ApiUser>(`/v1/users/${encodeURIComponent(id)}/membership`, {
+    const row = await apiFetch<ApiUser>(`/v1/admin/users/${encodeURIComponent(id)}/membership`, {
       method: "PATCH",
       body,
     });
@@ -805,7 +807,7 @@ export const users = {
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/users/${encodeURIComponent(id)}/membership`, { method: "DELETE" });
+    await apiFetch(`/v1/admin/users/${encodeURIComponent(id)}/membership`, { method: "DELETE" });
     invalidate("users");
   },
 };
@@ -976,7 +978,7 @@ export const audit = {
   async list(params: ListAuditParams = {}): Promise<PagedResponse<AuditRecord>> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiAudit[]; total: number }>("/v1/audit", {
+    const out = await apiFetch<{ items: ApiAudit[]; total: number }>("/v1/lab/audit", {
       query: { entity: params.entity, q: params.q, limit: params.limit },
     });
     return { items: out.items.map(auditFromApi), total: out.total };
@@ -1107,7 +1109,7 @@ export const roles = {
   async list(tenantId?: string): Promise<ApiRole[]> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiRole[] }>("/v1/roles", {
+    const out = await apiFetch<{ items: ApiRole[] }>("/v1/admin/roles", {
       query: tenantId ? { tenantId } : undefined,
     });
     return out.items;
@@ -1115,7 +1117,7 @@ export const roles = {
   async create(input: { name: string; permissions?: string[]; tenantId?: string }): Promise<ApiRole> {
     await tick();
     requireBackend();
-    return apiFetch<ApiRole>("/v1/roles", {
+    return apiFetch<ApiRole>("/v1/admin/roles", {
       method: "POST",
       body: {
         name: input.name,
@@ -1127,7 +1129,7 @@ export const roles = {
   async update(id: string, patch: { name?: string; permissions?: string[] }): Promise<ApiRole> {
     await tick();
     requireBackend();
-    return apiFetch<ApiRole>(`/v1/roles/${encodeURIComponent(id)}`, {
+    return apiFetch<ApiRole>(`/v1/admin/roles/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: patch,
     });
@@ -1135,7 +1137,7 @@ export const roles = {
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/roles/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await apiFetch(`/v1/admin/roles/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
 };
 
@@ -1160,13 +1162,13 @@ export const departments = {
   async list(): Promise<ApiDepartment[]> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiDepartment[] }>("/v1/departments");
+    const out = await apiFetch<{ items: ApiDepartment[] }>("/v1/master-setup/departments");
     return out.items;
   },
   async get(id: string): Promise<ApiDepartment> {
     await tick();
     requireBackend();
-    return apiFetch<ApiDepartment>(`/v1/departments/${encodeURIComponent(id)}`);
+    return apiFetch<ApiDepartment>(`/v1/master-setup/departments/${encodeURIComponent(id)}`);
   },
   async create(input: {
     name: string;
@@ -1175,7 +1177,7 @@ export const departments = {
   }): Promise<ApiDepartment> {
     await tick();
     requireBackend();
-    return apiFetch<ApiDepartment>("/v1/departments", {
+    return apiFetch<ApiDepartment>("/v1/master-setup/departments", {
       method: "POST",
       body: {
         name: input.name,
@@ -1191,7 +1193,7 @@ export const departments = {
   }): Promise<ApiDepartment> {
     await tick();
     requireBackend();
-    return apiFetch<ApiDepartment>(`/v1/departments/${encodeURIComponent(id)}`, {
+    return apiFetch<ApiDepartment>(`/v1/master-setup/departments/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: patch,
     });
@@ -1199,7 +1201,7 @@ export const departments = {
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/departments/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await apiFetch(`/v1/master-setup/departments/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
 };
 
@@ -1230,25 +1232,25 @@ export const clients = {
   async list(): Promise<ApiClient[]> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiClient[]; total: number }>("/v1/clients");
+    const out = await apiFetch<{ items: ApiClient[]; total: number }>("/v1/master-setup/clients");
     return out.items;
   },
   async get(id: string): Promise<ApiClient> {
     await tick();
     requireBackend();
-    return apiFetch<ApiClient>(`/v1/clients/${encodeURIComponent(id)}`);
+    return apiFetch<ApiClient>(`/v1/master-setup/clients/${encodeURIComponent(id)}`);
   },
   async create(input: Partial<ApiClient> & { code: string; name: string }): Promise<ApiClient> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiClient>("/v1/clients", { method: "POST", body: input });
+    const row = await apiFetch<ApiClient>("/v1/master-setup/clients", { method: "POST", body: input });
     invalidate("clients");
     return row;
   },
   async update(id: string, patch: Partial<ApiClient>): Promise<ApiClient> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiClient>(`/v1/clients/${encodeURIComponent(id)}`, {
+    const row = await apiFetch<ApiClient>(`/v1/master-setup/clients/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: patch,
     });
@@ -1258,7 +1260,7 @@ export const clients = {
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/clients/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await apiFetch(`/v1/master-setup/clients/${encodeURIComponent(id)}`, { method: "DELETE" });
     invalidate("clients");
   },
 };
@@ -1286,25 +1288,25 @@ export const engineers = {
   async list(): Promise<ApiEngineer[]> {
     await tick();
     requireBackend();
-    const out = await apiFetch<{ items: ApiEngineer[]; total: number }>("/v1/engineers");
+    const out = await apiFetch<{ items: ApiEngineer[]; total: number }>("/v1/master-setup/engineers");
     return out.items;
   },
   async get(id: string): Promise<ApiEngineer> {
     await tick();
     requireBackend();
-    return apiFetch<ApiEngineer>(`/v1/engineers/${encodeURIComponent(id)}`);
+    return apiFetch<ApiEngineer>(`/v1/master-setup/engineers/${encodeURIComponent(id)}`);
   },
   async create(input: Partial<ApiEngineer> & { code: string; name: string }): Promise<ApiEngineer> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiEngineer>("/v1/engineers", { method: "POST", body: input });
+    const row = await apiFetch<ApiEngineer>("/v1/master-setup/engineers", { method: "POST", body: input });
     invalidate("engineers");
     return row;
   },
   async update(id: string, patch: Partial<ApiEngineer>): Promise<ApiEngineer> {
     await tick();
     requireBackend();
-    const row = await apiFetch<ApiEngineer>(`/v1/engineers/${encodeURIComponent(id)}`, {
+    const row = await apiFetch<ApiEngineer>(`/v1/master-setup/engineers/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: patch,
     });
@@ -1314,7 +1316,7 @@ export const engineers = {
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/engineers/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await apiFetch(`/v1/master-setup/engineers/${encodeURIComponent(id)}`, { method: "DELETE" });
     invalidate("engineers");
   },
 };

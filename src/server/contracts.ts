@@ -82,7 +82,9 @@ export interface PagedResponse<T> {
 // Mutation inputs
 // ---------------------------------------------------------------------------
 
-export type CreateProjectInput   = Omit<ProjectRecord, "id" | "sampleCount" | "testCount">;
+export type CreateProjectInput   =
+  Omit<ProjectRecord, "id" | "sampleCount" | "testCount" | "code">
+  & { /** Optional — backend auto-generates PRJ-YYYY-NNN per tenant. */ code?: string };
 export type UpdateProjectInput   = Partial<CreateProjectInput>;
 export type CreateSampleInput    = Omit<SampleRecord, "id">;
 export type CreateTestInput      = Omit<TestRecord, "id">;

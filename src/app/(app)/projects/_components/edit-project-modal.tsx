@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
+import { useClientsQuery } from "@/server/queries";
 import { ClientSelect } from "./client-select";
 import { EngineerSelect } from "./engineer-select";
 import type { ProjectRecord } from "@/server/contracts";
@@ -21,6 +22,7 @@ interface Props {
 export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
   const tt = useT();
   const loc = useLoc();
+  const { data: clients = [] } = useClientsQuery();
 
   const [name, setName] = useState(loc(project.name));
   const [client, setClient] = useState(loc(project.client));
@@ -47,6 +49,15 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
     setContractValue(String(project.contractValue ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, project.id]);
+
+  // Always show the *current* email from Client setup, not the one frozen on
+  // the project at create-time. If the client picker has loaded and the
+  // selected client exists there, take its contactEmail.
+  useEffect(() => {
+    if (!open || !client) return;
+    const picked = clients.find((c) => c.name === client);
+    if (picked) setClientEmail(picked.contactEmail ?? null);
+  }, [open, client, clients]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

@@ -29,7 +29,7 @@ export default function ClientsSetupPage() {
         setError(tt("Backend offline — sign in to load clients."));
         return;
       }
-      const out = await apiFetch<{ items: ClientRecord[]; total: number }>("/v1/clients");
+      const out = await apiFetch<{ items: ClientRecord[]; total: number }>("/v1/master-setup/clients");
       setClients(out.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load clients");
@@ -48,8 +48,8 @@ export default function ClientsSetupPage() {
     const result = await mutate(
       () =>
         isUpdate
-          ? apiFetch<ClientRecord>(`/v1/clients/${editing!.id}`, { method: "PATCH", body: input })
-          : apiFetch<ClientRecord>(`/v1/clients`,                  { method: "POST",  body: input }),
+          ? apiFetch<ClientRecord>(`/v1/master-setup/clients/${editing!.id}`, { method: "PATCH", body: input })
+          : apiFetch<ClientRecord>(`/v1/master-setup/clients`,                  { method: "POST",  body: input }),
       isUpdate ? tt(`Client "${editing!.code}" updated`) : tt(`Client "${input.code}" created`)
     );
     if (!result) return;
@@ -61,7 +61,7 @@ export default function ClientsSetupPage() {
   const onDelete = async (client: ClientRecord) => {
     if (!confirm(tt(`Delete client "${client.name}"? This cannot be undone.`))) return;
     try {
-      await apiFetch(`/v1/clients/${client.id}`, { method: "DELETE" });
+      await apiFetch(`/v1/master-setup/clients/${client.id}`, { method: "DELETE" });
       toast.success(tt(`Client "${client.code}" deleted`));
       void refresh();
     } catch (e) {

@@ -54,15 +54,40 @@ export function ToastViewport() {
   return (
     <div className="fixed top-4 right-4 z-[80] space-y-2 w-[360px] max-w-[calc(100vw-2rem)]">
       {items.map((t) => {
+        // Dark-mode toasts now use solid backgrounds + a tinted left border
+        // so they read clearly against any page underneath.
         const cfg = {
-          info:    { Icon: Info,         tone: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200" },
-          success: { Icon: CheckCircle2, tone: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200" },
-          warn:    { Icon: AlertCircle,  tone: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" },
-          error:   { Icon: AlertCircle,  tone: "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200" },
+          info: {
+            Icon: Info,
+            tone: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-900 dark:text-sky-50",
+            iconTone: "text-sky-600 dark:text-sky-300",
+          },
+          success: {
+            Icon: CheckCircle2,
+            tone: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-50",
+            iconTone: "text-emerald-600 dark:text-emerald-300",
+          },
+          warn: {
+            Icon: AlertCircle,
+            tone: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-50",
+            iconTone: "text-amber-600 dark:text-amber-300",
+          },
+          error: {
+            Icon: AlertCircle,
+            tone: "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-50",
+            iconTone: "text-rose-600 dark:text-rose-200",
+          },
         }[t.tone];
         return (
-          <div key={t.id} className={cn("rounded-lg border shadow-md p-3 flex items-start gap-2", cfg.tone)}>
-            <cfg.Icon className="w-4 h-4 mt-0.5 shrink-0" />
+          <div
+            key={t.id}
+            className={cn(
+              "rounded-lg border shadow-lg p-3 flex items-start gap-2 backdrop-blur-none",
+              "dark:shadow-black/40",
+              cfg.tone,
+            )}
+          >
+            <cfg.Icon className={cn("w-4 h-4 mt-0.5 shrink-0", cfg.iconTone)} />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold leading-tight">{t.title}</div>
               {t.detail && <div className="text-xs mt-1 opacity-90">{t.detail}</div>}
@@ -70,7 +95,7 @@ export function ToastViewport() {
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="opacity-60 hover:opacity-100"
+              className="opacity-70 hover:opacity-100"
               aria-label="Dismiss"
             >
               <X className="w-3.5 h-3.5" />

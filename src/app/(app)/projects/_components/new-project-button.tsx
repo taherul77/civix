@@ -11,14 +11,11 @@ import { ClientSelect } from "./client-select";
 import { EngineerSelect } from "./engineer-select";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const autoCode = () => `PRJ-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
 
 export function NewProjectButton() {
   const tt = useT();
   const canCreate = useCan("project:create");
   const [open, setOpen] = useState(false);
-  // Auto-generated server-side-style code; not editable by the user.
-  const [code, setCode] = useState(autoCode());
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
   const [clientEmail, setClientEmail] = useState<string | null>(null);
@@ -31,16 +28,15 @@ export function NewProjectButton() {
   if (!canCreate) return null;
 
   const reset = () => {
-    setCode(autoCode());
     setName(""); setClient(""); setClientEmail(null); setCity(""); setEngineer("");
     setStatus("active"); setStartDate(today()); setEndDate(""); setContractValue("");
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !code.trim()) return;
+    if (!name.trim()) return;
+    // Code is omitted — the backend assigns the next PRJ-YYYY-NNN per tenant.
     const created = await mutate(() => api.projects.create({
-      code: code.trim(),
       name: name.trim(),
       client: client.trim(),
       clientEmail: clientEmail ?? null,
@@ -50,7 +46,7 @@ export function NewProjectButton() {
       startDate,
       endDate: endDate || startDate,
       contractValue: Number(contractValue) || 0,
-    }), `Project ${code.trim()} created`);
+    }), tt("Project created"));
     if (!created) return;
     reset();
     setOpen(false);

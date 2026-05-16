@@ -52,11 +52,13 @@ export function EngineerModal({ open, mode, initial, onClose, onSave }: Props) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !name.trim()) return;
+    if (!name.trim()) return;
     setSaving(true);
     try {
       await onSave({
-        code: code.trim(),
+        // Omit `code` so the backend auto-generates ENG-NNN per tenant on
+        // create. On edit, preserve the existing code from `initial`.
+        ...(initial?.code ? { code: initial.code } : {}),
         name: name.trim(),
         email:         email.trim()         || undefined,
         phone:         phone.trim()         || undefined,
@@ -90,18 +92,19 @@ export function EngineerModal({ open, mode, initial, onClose, onSave }: Props) {
       }
     >
       <form id="engineer-form" onSubmit={submit} className="space-y-5">
+        {/* Identity — code is auto-generated server-side (ENG-NNN per tenant). */}
         <section>
           <h4 className="text-xs font-bold uppercase tracking-wider text-[rgb(var(--muted))] mb-2">
             {tt("Identity")}
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label={tt("Engineer code")}>
-              <input className="input font-mono" value={code} onChange={(e) => setCode(e.target.value)} required placeholder="ENG-001" />
-            </Field>
-            <Field label={tt("Full name")}>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Eng. Mohammed Al-Saud" />
-            </Field>
-          </div>
+          <Field label={tt("Full name")}>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Eng. Mohammed Al-Saud" />
+          </Field>
+          {mode === "edit" && initial?.code && (
+            <div className="text-[10px] text-[rgb(var(--muted))] mt-2 font-mono">
+              {tt("Code")}: {initial.code}
+            </div>
+          )}
         </section>
 
         <section>

@@ -29,7 +29,7 @@ export default function LaboratorySetupPage() {
         setError(tt("Backend offline — sign in to load laboratories."));
         return;
       }
-      const out = await apiFetch<{ items: LaboratoryRecord[]; total: number }>("/v1/laboratories");
+      const out = await apiFetch<{ items: LaboratoryRecord[]; total: number }>("/v1/master-setup/laboratories");
       setLabs(out.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load laboratories");
@@ -48,8 +48,8 @@ export default function LaboratorySetupPage() {
     const result = await mutate(
       () =>
         isUpdate
-          ? apiFetch<LaboratoryRecord>(`/v1/laboratories/${editing!.id}`, { method: "PATCH", body: input })
-          : apiFetch<LaboratoryRecord>(`/v1/laboratories`,                  { method: "POST",  body: input }),
+          ? apiFetch<LaboratoryRecord>(`/v1/master-setup/laboratories/${editing!.id}`, { method: "PATCH", body: input })
+          : apiFetch<LaboratoryRecord>(`/v1/master-setup/laboratories`,                  { method: "POST",  body: input }),
       isUpdate ? tt(`Laboratory "${editing!.code}" updated`) : tt(`Laboratory "${input.code}" created`)
     );
     if (!result) return;
@@ -61,7 +61,7 @@ export default function LaboratorySetupPage() {
   const onDelete = async (lab: LaboratoryRecord) => {
     if (!confirm(tt(`Delete laboratory "${lab.name}"? This cannot be undone.`))) return;
     try {
-      await apiFetch(`/v1/laboratories/${lab.id}`, { method: "DELETE" });
+      await apiFetch(`/v1/master-setup/laboratories/${lab.id}`, { method: "DELETE" });
       toast.success(tt(`Laboratory "${lab.code}" deleted`));
       void refresh();
     } catch (e) {

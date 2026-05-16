@@ -77,11 +77,13 @@ export function ClientModal({ open, mode, initial, onClose, onSave }: Props) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !name.trim()) return;
+    if (!name.trim()) return;
     setSaving(true);
     try {
       await onSave({
-        code: code.trim(),
+        // Omit `code` so the backend auto-generates CLI-NNN per tenant on
+        // create. On edit, preserve the existing code from `initial`.
+        ...(initial?.code ? { code: initial.code } : {}),
         name: name.trim(),
         contactName:  contactName.trim()  || undefined,
         contactEmail: contactEmail.trim() || undefined,
@@ -119,19 +121,19 @@ export function ClientModal({ open, mode, initial, onClose, onSave }: Props) {
       }
     >
       <form id="client-form" onSubmit={submit} className="space-y-5">
-        {/* Identity */}
+        {/* Identity — code is auto-generated server-side (CLI-NNN per tenant). */}
         <section>
           <h4 className="text-xs font-bold uppercase tracking-wider text-[rgb(var(--muted))] mb-2">
             {tt("Identity")}
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label={tt("Client code")}>
-              <input className="input font-mono" value={code} onChange={(e) => setCode(e.target.value)} required placeholder="CLI-001" />
-            </Field>
-            <Field label={tt("Client name")}>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Acme Construction Co." />
-            </Field>
-          </div>
+          <Field label={tt("Client name")}>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Acme Construction Co." />
+          </Field>
+          {mode === "edit" && initial?.code && (
+            <div className="text-[10px] text-[rgb(var(--muted))] mt-2 font-mono">
+              {tt("Code")}: {initial.code}
+            </div>
+          )}
         </section>
 
         {/* Contact */}

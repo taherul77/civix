@@ -37,7 +37,7 @@ export default function PagePermissionsPage() {
   const [roleNames, setRoleNames] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>("");
 
-  // Load the tenant's role catalogue from /v1/roles so the picker reflects
+  // Load the tenant's role catalogue from /v1/admin/roles so the picker reflects
   // whatever this tenant has defined (built-in templates + custom roles).
   // Super Admin role is only visible to actual super-admin users.
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function PagePermissionsPage() {
     let cancelled = false;
     apiFetch<{
       items: Array<{ role: string; pageId: string; view: boolean; create: boolean; edit: boolean; delete: boolean }>;
-    }>("/v1/role-permissions")
+    }>("/v1/admin/role-permissions")
       .then((out) => {
         if (cancelled) return;
         hydratePagePermissions(out.items);
@@ -185,7 +185,7 @@ export default function PagePermissionsPage() {
         edit:   !!draft[p.id]?.edit,
         delete: !!draft[p.id]?.delete,
       }));
-      await apiFetch(`/v1/role-permissions/${encodeURIComponent(selectedRole)}`, {
+      await apiFetch(`/v1/admin/role-permissions/${encodeURIComponent(selectedRole)}`, {
         method: "PUT",
         body: { pages },
       });
