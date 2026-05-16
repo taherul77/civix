@@ -54,6 +54,7 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   CreateSampleInput,
+  UpdateSampleInput,
   CreateTestInput,
   DashboardStats,
   EquipmentRecord,
@@ -511,6 +512,46 @@ export const samples = {
         status:         input.status === "in_test" ? "in_progress" : input.status,
       },
     });
+    invalidate("samples", "dashboard");
+    return sampleFromApi(row);
+  },
+
+  /** PATCH /v1/operations/samples/:id — partial update. Locked once in_progress. */
+  async update(id: string, patch: UpdateSampleInput): Promise<SampleRecord> {
+    await tick();
+    requireBackend();
+    const body: Record<string, unknown> = {};
+    if (patch.type      !== undefined) body.sampleType     = patch.type;
+    if (patch.date      !== undefined) body.sampleDate     = new Date(patch.date).toISOString();
+    if (patch.sampledBy !== undefined) body.sampledBy      = locStr(patch.sampledBy);
+    if (patch.location  !== undefined) body.sampleLocation = locStr(patch.location);
+    if (patch.status    !== undefined) {
+      body.status = patch.status === "in_test" ? "in_progress" : patch.status;
+    }
+    const row = await apiFetch<ApiSample>(`/v1/operations/samples/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body,
+    });
+    invalidate("samples", "dashboard");
+    return sampleFromApi(row);
+  },
+
+  /** DELETE /v1/operations/samples/:id — refuses once in_progress / completed. */
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch<void>(`/v1/operations/samples/${encodeURIComponent(id)}`, { method: "DELETE" });
+    invalidate("samples", "tests", "dashboard");
+  },
+
+  /** POST /v1/operations/samples/:id/send — push into test workflow. */
+  async send(id: string): Promise<SampleRecord> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiSample>(
+      `/v1/operations/samples/${encodeURIComponent(id)}/send`,
+      { method: "POST", body: {} },
+    );
     invalidate("samples", "dashboard");
     return sampleFromApi(row);
   },

@@ -87,6 +87,7 @@ export type CreateProjectInput   =
   & { /** Optional — backend auto-generates PRJ-YYYY-NNN per tenant. */ code?: string };
 export type UpdateProjectInput   = Partial<CreateProjectInput>;
 export type CreateSampleInput    = Omit<SampleRecord, "id">;
+export type UpdateSampleInput    = Partial<CreateSampleInput>;
 export type CreateTestInput      = Omit<TestRecord, "id">;
 export type CreateEquipmentInput = Omit<EquipmentRecord, "id">;
 export type InviteUserInput      = Omit<UserRecord, "id">;
