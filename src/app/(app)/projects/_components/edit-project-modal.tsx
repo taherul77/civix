@@ -81,8 +81,8 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
           </button>
           <button type="submit" form="edit-project-form" className="btn btn-primary" disabled={saving}>
             {saving
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> {tt("Saving…")}</>
-              : <><Save className="w-4 h-4" /> {tt("Save changes")}</>}
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> {tt("Updating…")}</>
+              : <><Save className="w-4 h-4" /> {tt("Update")}</>}
           </button>
         </>
       }
@@ -122,9 +122,6 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
             onChange={(e) => setContractValue(e.target.value)}
           />
         </Field>
-        <div className="md:col-span-2 text-xs text-[rgb(var(--muted))] font-mono pt-2 border-t border-[rgb(var(--border))]">
-          {tt("Code")}: {project.code} · {tt("ID")}: {project.id}
-        </div>
       </form>
     </Modal>
   );
