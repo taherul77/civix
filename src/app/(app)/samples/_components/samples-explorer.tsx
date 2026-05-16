@@ -146,21 +146,47 @@ export function SamplesExplorer() {
   );
 
   return (
-    <DataTable
-      rows={samples}
-      columns={columns}
-      getRowId={(s) => s.id}
-      loading={isLoading}
-      error={error?.message ?? null}
-      searchable
-      searchPlaceholder={tt("Search by code or location…")}
-      searchFilter={(s, q) => {
-        const p = projectsById.get(s.projectId);
-        return [String(s.code), s.type, loc(s.location), loc(s.sampledBy), p ? loc(p.name) : ""]
-          .join(" ").toLowerCase().includes(q);
-      }}
-      toolbar={toolbar}
-      empty={tt("No samples match your filters.")}
-    />
+    <>
+      <DataTable
+        rows={samples}
+        columns={columns}
+        getRowId={(s) => s.id}
+        loading={isLoading}
+        error={error?.message ?? null}
+        searchable
+        searchPlaceholder={tt("Search by code or location…")}
+        searchFilter={(s, q) => {
+          const p = projectsById.get(s.projectId);
+          return [String(s.code), s.type, loc(s.location), loc(s.sampledBy), p ? loc(p.name) : ""]
+            .join(" ").toLowerCase().includes(q);
+        }}
+        toolbar={toolbar}
+        empty={tt("No samples match your filters.")}
+      />
+
+      {editing && (
+        <EditSampleModal
+          open
+          sample={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {removing && (
+        <DeleteSampleModal
+          open
+          sample={removing}
+          onClose={() => setRemoving(null)}
+        />
+      )}
+
+      {sending && (
+        <SendSampleModal
+          open
+          sample={sending}
+          onClose={() => setSending(null)}
+        />
+      )}
+    </>
   );
 }
