@@ -38,6 +38,7 @@ import {
 } from "@/lib/record-adapters";
 import { require as requirePerm, requireAuth } from "@/server/guard";
 import { errors } from "@/server/errors";
+import { invalidate } from "@/server/invalidation";
 import {
   generateBase32Secret,
   generateRecoveryCodes,
@@ -418,6 +419,7 @@ export const projects = {
         status: input.status,
       },
     });
+    invalidate("projects", "dashboard");
     return projectFromApi(row);
   },
 };
@@ -459,6 +461,7 @@ export const samples = {
         status:         input.status === "in_test" ? "in_progress" : input.status,
       },
     });
+    invalidate("samples", "dashboard");
     return sampleFromApi(row);
   },
 };
@@ -506,6 +509,7 @@ export const tests = {
         passFailStatus: input.passFail === "pass" ? "pass" : input.passFail === "fail" ? "fail" : undefined,
       },
     });
+    invalidate("tests", "dashboard");
     return testFromApi(row);
   },
 
@@ -513,18 +517,21 @@ export const tests = {
     await tick();
     requireBackend();
     await apiFetch(`/v1/tests/${id}/submit`, { method: "POST", body: {} });
+    invalidate("tests", "audit", "dashboard");
   },
 
   async review(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } });
+    invalidate("tests", "audit", "dashboard");
   },
 
   async approve(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } });
+    invalidate("tests", "audit", "dashboard");
   },
 
   async sign(id: string, input: SignInput): Promise<void> {
@@ -532,12 +539,14 @@ export const tests = {
     if (!input.certificateSerial) throw errors.validation("Certificate serial required for signing");
     requireBackend();
     await apiFetch(`/v1/tests/${id}/sign`, { method: "POST", body: { certificateSerial: input.certificateSerial } });
+    invalidate("tests", "audit", "dashboard");
   },
 
   async reject(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } });
+    invalidate("tests", "audit", "dashboard");
   },
 };
 
@@ -583,6 +592,7 @@ export const equipment = {
         status:             input.status,
       },
     });
+    invalidate("equipment", "dashboard");
     return equipmentFromApi(row);
   },
 
@@ -730,6 +740,7 @@ export const users = {
         phone: input.phone ?? undefined,
       },
     });
+    invalidate("users");
     return userFromApi(row);
   },
   async update(id: string, patch: {
@@ -755,12 +766,14 @@ export const users = {
       method: "PATCH",
       body,
     });
+    invalidate("users");
     return userFromApi(row);
   },
   async remove(id: string): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/users/${encodeURIComponent(id)}/membership`, { method: "DELETE" });
+    invalidate("users");
   },
 };
 

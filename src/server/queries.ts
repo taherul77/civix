@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/store/app-store";
 import { api } from "@/server/api";
+import { subscribeInvalidation, topicFromKey } from "@/server/invalidation";
 import type {
   DashboardStats,
   ListAuditParams,
@@ -41,7 +42,11 @@ const ok = <T,>(data: T): QueryResult<T> => ({ data, isLoading: false, error: nu
  * is called. Returns a TanStack-Query-shaped result so call sites can move
  * to React Query later without changing.
  */
-function useApiQuery<T>(fetcher: () => Promise<T>, key: string): QueryResult<T> {
+function useApiQuery<T>(
+  fetcher: () => Promise<T>,
+  key: string,
+  extraTopics: string[] = [],
+): QueryResult<T> {
   const [data, setData] = useState<T | undefined>(undefined);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,6 +62,16 @@ function useApiQuery<T>(fetcher: () => Promise<T>, key: string): QueryResult<T> 
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, tick]);
+
+  // Refetch when any subscribed topic is invalidated by a mutation.
+  useEffect(() => {
+    const topics = Array.from(new Set([topicFromKey(key), ...extraTopics]));
+    const bump = () => setTick((t) => t + 1);
+    const unsubs = topics.map((t) => subscribeInvalidation(t, bump));
+    return () => { for (const u of unsubs) u(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, extraTopics.join("|")]);
+
   return { data, isLoading, error, refetch: () => setTick((t) => t + 1) };
 }
 

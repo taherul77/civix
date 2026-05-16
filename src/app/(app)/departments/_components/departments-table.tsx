@@ -5,6 +5,7 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import { useCan } from "@/lib/auth-context";
 import { Modal, Field } from "@/components/ui/modal";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { api, type ApiDepartment } from "@/server/api";
 import { mutate } from "@/server/mutate";
 
@@ -34,91 +35,107 @@ export function DepartmentsTable() {
 
   useEffect(() => { refetch(); }, []);
 
+  const columns: ColumnDef<ApiDepartment>[] = [
+    {
+      key: "name",
+      header: tt("Name"),
+      cell: (d) => <span className="font-medium">{d.name}</span>,
+      sort: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      key: "code",
+      header: tt("Code"),
+      cell: (d) => <span className="text-sm font-mono">{d.code}</span>,
+      sort: (a, b) => a.code.localeCompare(b.code),
+    },
+    {
+      key: "description",
+      header: tt("Description"),
+      cell: (d) => <span className="text-sm text-[rgb(var(--muted))]">{d.description ?? "—"}</span>,
+    },
+    {
+      key: "status",
+      header: tt("Status"),
+      cell: (d) => d.isActive
+        ? <span className="badge badge-pass">{tt("Active")}</span>
+        : <span className="badge badge-warn">{tt("Inactive")}</span>,
+      sort: (a, b) => Number(b.isActive) - Number(a.isActive),
+    },
+    {
+      key: "createdAt",
+      header: tt("Created"),
+      cell: (d) => (
+        <div className="text-xs">
+          <div>{formatDateTime(d.createdAt)}</div>
+          {d.createdBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.createdBy}</div>}
+        </div>
+      ),
+      sort: (a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
+    },
+    {
+      key: "updatedAt",
+      header: tt("Updated"),
+      cell: (d) => (
+        <div className="text-xs">
+          <div>{formatDateTime(d.updatedAt)}</div>
+          {d.updatedBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.updatedBy}</div>}
+        </div>
+      ),
+      sort: (a, b) => (a.updatedAt ?? "").localeCompare(b.updatedAt ?? ""),
+    },
+    {
+      key: "actions",
+      header: tt("Actions"),
+      align: "right",
+      cell: (d) => (
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setViewing(d)}
+            className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
+            title={tt("View")}
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setEditing(d)}
+              className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
+              title={tt("Edit")}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setRemoving(d)}
+              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
+              title={tt("Delete")}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="civix">
-          <thead>
-            <tr>
-              <th>{tt("Name")}</th>
-              <th>{tt("Code")}</th>
-              <th>{tt("Description")}</th>
-              <th>{tt("Status")}</th>
-              <th>{tt("Created")}</th>
-              <th>{tt("Updated")}</th>
-              <th className="text-right">{tt("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((d) => (
-              <tr key={d.id}>
-                <td className="font-medium">{d.name}</td>
-                <td className="text-sm font-mono">{d.code}</td>
-                <td className="text-sm text-[rgb(var(--muted))]">{d.description ?? "—"}</td>
-                <td>
-                  {d.isActive
-                    ? <span className="badge badge-pass">{tt("Active")}</span>
-                    : <span className="badge badge-warn">{tt("Inactive")}</span>}
-                </td>
-                <td className="text-xs">
-                  <div>{formatDateTime(d.createdAt)}</div>
-                  {d.createdBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.createdBy}</div>}
-                </td>
-                <td className="text-xs">
-                  <div>{formatDateTime(d.updatedAt)}</div>
-                  {d.updatedBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {d.updatedBy}</div>}
-                </td>
-                <td className="text-right">
-                  <div className="inline-flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setViewing(d)}
-                      className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                      title={tt("View")}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(d)}
-                        className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                        title={tt("Edit")}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => setRemoving(d)}
-                        className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
-                        title={tt("Delete")}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-center text-sm text-[rgb(var(--muted))] py-8">
-                  {tt("No departments yet — add the first one.")}
-                </td>
-              </tr>
-            )}
-            {loading && (
-              <tr>
-                <td colSpan={7} className="text-center text-sm text-[rgb(var(--muted))] py-8">
-                  {tt("Loading…")}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <>
+      <DataTable
+        rows={items}
+        columns={columns}
+        getRowId={(d) => d.id}
+        loading={loading}
+        searchable
+        searchPlaceholder={tt("Search departments…")}
+        searchFilter={(d, q) =>
+          [d.name, d.code, d.description ?? ""].join(" ").toLowerCase().includes(q)
+        }
+        empty={tt("No departments yet — add the first one.")}
+      />
 
       {viewing && (
         <ViewDepartmentModal
@@ -140,7 +157,7 @@ export function DepartmentsTable() {
           onRemoved={() => { setRemoving(null); refetch(); }}
         />
       )}
-    </div>
+    </>
   );
 }
 

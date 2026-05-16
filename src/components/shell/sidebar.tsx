@@ -30,6 +30,7 @@ import {
   ShieldHalf,
   UsersRound,
   Crown,
+  Briefcase,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
 import { t, useT, type DictKey } from "@/lib/i18n";
@@ -102,7 +103,7 @@ const groups: { title: string; items: NavItem[] }[] = [
         children: [
           { href: "/calendar",      key: "calendar",      label: "Calendar",    icon: CalendarDays },
           { href: "/map",           key: "map",           label: "Sample map",  icon: Map },
-          { href: "/notifications", key: "notifications", label: "Alerts",      icon: Bell },
+          // { href: "/notifications", key: "notifications", label: "Alerts",      icon: Bell },
         ],
       },
       {
@@ -111,8 +112,8 @@ const groups: { title: string; items: NavItem[] }[] = [
         icon: FlaskConical,
         children: [
           { href: "/equipment", key: "equipment", icon: Wrench },
-          { href: "/field",     key: "field",     label: "Field (mobile)", icon: Smartphone },
-          { href: "/audit",     key: "audit",     label: "Audit log",      icon: ShieldCheck },
+          // { href: "/field",     key: "field",     label: "Field (mobile)", icon: Smartphone },
+          // { href: "/audit",     key: "audit",     label: "Audit log",      icon: ShieldCheck },
         ],
       },
       {
@@ -123,6 +124,7 @@ const groups: { title: string; items: NavItem[] }[] = [
           { href: "/company",    key: "company",    label: "Company setup",    icon: Building2 },
           { href: "/laboratory", key: "laboratory", label: "Laboratory setup", icon: FlaskConical },
           { href: "/departments", key: "departments", label: "Department setup", icon: UsersRound },
+          { href: "/clients",    key: "clients",    label: "Client setup",     icon: Briefcase },
         ],
       },
       {
@@ -131,9 +133,9 @@ const groups: { title: string; items: NavItem[] }[] = [
         icon: ShieldCheck,
         children: [
           { href: "/users",       key: "users",       icon: Users },
-          { href: "/security",    key: "security",    label: "Security",    icon: KeyRound },
-          { href: "/white-label", key: "white-label", label: "White-label", icon: Palette },
-          { href: "/billing",     key: "billing",     label: "Billing",     icon: Receipt },
+          // { href: "/security",    key: "security",    label: "Security",    icon: KeyRound },
+          // { href: "/white-label", key: "white-label", label: "White-label", icon: Palette },
+          // { href: "/billing",     key: "billing",     label: "Billing",     icon: Receipt },
         ],
       },
       // Settings as its own top-level branch, separate from Admin.
