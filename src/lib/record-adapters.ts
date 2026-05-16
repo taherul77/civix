@@ -51,6 +51,9 @@ export interface ApiProject {
   // payloads still parse.
   sampleCount?: number | null;
   testCount?: number | null;
+  sentAt?: string | null;
+  sentByEmail?: string | null;
+  sentByName?: string | null;
 }
 
 export function projectFromApi(p: ApiProject): Project {
@@ -62,12 +65,15 @@ export function projectFromApi(p: ApiProject): Project {
     clientEmail: p.clientEmail ?? null,
     city: p.city ?? "",
     engineer: p.engineerName ?? "",
-    status: (["active", "on_hold", "completed"].includes(p.status) ? p.status : "active") as Project["status"],
+    status: (["active", "inactive", "on_hold", "in_process", "completed"].includes(p.status) ? p.status : "active") as Project["status"],
     startDate: isoDate(p.startDate),
     endDate: isoDate(p.endDate),
     contractValue: typeof p.contractValue === "string" ? Number(p.contractValue) : (p.contractValue ?? 0),
     sampleCount: p.sampleCount ?? undefined,
     testCount:   p.testCount   ?? undefined,
+    sentAt:       p.sentAt       ?? null,
+    sentByEmail:  p.sentByEmail  ?? null,
+    sentByName:   p.sentByName   ?? null,
   };
 }
 

@@ -17,9 +17,36 @@ export function ProjectDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: project } = useProjectQuery(id);
+  const { data: project, isLoading, error } = useProjectQuery(id);
   const { data: projectSamples = [] } = useSamplesQuery({ projectId: id });
   const { data: projectTests   = [] } = useTestsQuery({ projectId: id });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-4 w-32 rounded bg-[rgb(var(--muted))]/20 animate-pulse" />
+        <div className="h-8 w-64 rounded bg-[rgb(var(--muted))]/20 animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card p-4 h-20 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Link href="/projects" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
+          <ArrowLeft className="w-4 h-4" /> {tt("Back to projects")}
+        </Link>
+        <div className="rounded-lg p-4 bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-sm">
+          {error.message}
+        </div>
+      </div>
+    );
+  }
 
   if (!project) notFound();
 

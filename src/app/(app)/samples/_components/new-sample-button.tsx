@@ -14,22 +14,17 @@ import type { Sample } from "@/lib/mock-data";
 const TYPES = ["concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
 const today = () => new Date().toISOString().slice(0, 10);
 
-function autoSampleCode() {
-  const d = new Date();
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const n = String(Math.floor(Math.random() * 9000) + 1000);
-  return `S-${yy}-${mm}-${n}`;
-}
-
 export function NewSampleButton() {
   const tt = useT();
   const loc = useLoc();
-  const { data: projects = [] } = useProjectsQuery();
+  // Samples can only be attached to projects that have been sent into the
+  // sample workflow (status === "in_process"). Active / on_hold / inactive
+  // are intentionally hidden so users can't bypass the Send step.
+  const { data: allProjects = [] } = useProjectsQuery();
+  const projects = allProjects.filter((p) => p.status === "in_process");
   const actor = useActor();
   const canCreate = useCan("sample:create");
   const [open, setOpen] = useState(false);
-  const [code, setCode] = useState(autoSampleCode());
   const [type, setType] = useState<Sample["type"]>("concrete");
   const [projectId, setProjectId] = useState("");
   const [location, setLocation] = useState("");
@@ -41,18 +36,18 @@ export function NewSampleButton() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const useProject = projectId || projects[0]?.id || "";
-    if (!code.trim() || !useProject) return;
+    if (!useProject) return;
     const created = await mutate(() => api.samples.create({
-      code: code.trim(),
+      // Empty code → backend auto-generates SMP-YYYY-NNN per tenant.
+      code: "",
       type,
       projectId: useProject,
       date,
       location: location.trim(),
       sampledBy: sampledBy.trim() || actor?.name || "—",
       status,
-    }), `Sample ${code.trim()} created`);
+    }), tt(`Sample created`));
     if (!created) return;
-    setCode(autoSampleCode());
     setLocation(""); setSampledBy(""); setStatus("pending");
     setOpen(false);
   };
@@ -75,10 +70,7 @@ export function NewSampleButton() {
         }
       >
         <form id="new-sample-form" onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label={tt("Code")}>
-            <input className="input" value={code} onChange={(e) => setCode(e.target.value)} required />
-          </Field>
-          <Field label={tt("Type")}>
+          <Field label={tt("Type")} span={2}>
             <select className="input capitalize" value={type} onChange={(e) => setType(e.target.value as Sample["type"])}>
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -90,6 +82,11 @@ export function NewSampleButton() {
                 <option key={p.id} value={p.id}>{p.code} — {loc(p.name)}</option>
               ))}
             </select>
+            {projects.length === 0 && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                {tt("No projects available — send a project to samples first from the Projects page.")}
+              </p>
+            )}
           </Field>
           <Field label={tt("Location")} span={2}>
             <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} />

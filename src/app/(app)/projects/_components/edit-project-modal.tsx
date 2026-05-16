@@ -110,8 +110,8 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
         <Field label={tt("Status")} span={2}>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as ProjectRecord["status"])}>
             <option value="active">{tt("Active")}</option>
+            <option value="inactive">{tt("Inactive")}</option>
             <option value="on_hold">{tt("On hold")}</option>
-            <option value="completed">{tt("Completed")}</option>
           </select>
         </Field>
         <Field label={tt("Client")}>

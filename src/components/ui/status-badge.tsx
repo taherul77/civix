@@ -12,6 +12,8 @@ const statusMap: Record<string, { label: string; cls: string }> = {
   in_test:         { label: "In test",         cls: "badge-warn" },
   completed:       { label: "Completed",       cls: "badge-pass" },
   active:          { label: "Active",          cls: "badge-pass" },
+  inactive:        { label: "Inactive",        cls: "badge-muted" },
+  in_process:      { label: "In Process",      cls: "badge-info" },
   on_hold:         { label: "On hold",         cls: "badge-warn" },
   calibration_due: { label: "Cal. due",        cls: "badge-warn" },
   out_of_service:  { label: "Out of service",  cls: "badge-fail" },

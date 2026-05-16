@@ -21,7 +21,9 @@ export function NewProjectButton() {
   const [clientEmail, setClientEmail] = useState<string | null>(null);
   const [city, setCity] = useState("");
   const [engineer, setEngineer] = useState("");
-  const [status, setStatus] = useState<"active" | "on_hold" | "completed">("active");
+  // Create flow only allows active/inactive. on_hold is a paused-after-creation
+  // state (Edit only); in_process / completed are workflow-driven.
+  const [status, setStatus] = useState<"active" | "inactive">("active");
   const [startDate, setStartDate] = useState(today());
   const [endDate, setEndDate] = useState("");
   const [contractValue, setContractValue] = useState("");
@@ -76,8 +78,7 @@ export function NewProjectButton() {
           <Field label={tt("Status")} span={2}>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as never)}>
               <option value="active">{tt("Active")}</option>
-              <option value="on_hold">{tt("On hold")}</option>
-              <option value="completed">{tt("Completed")}</option>
+              <option value="inactive">{tt("Inactive")}</option>
             </select>
           </Field>
           <Field label={tt("Client")}>

@@ -11,7 +11,11 @@ export interface Project {
   clientEmail?: string | null;
   city: LocStr;
   engineer: LocStr;
-  status: "active" | "on_hold" | "completed";
+  status: "active" | "inactive" | "on_hold" | "in_process" | "completed";
+  /** Set by POST /:id/send. */
+  sentAt?: string | null;
+  sentByEmail?: string | null;
+  sentByName?: string | null;
   startDate: string;
   endDate: string;
   contractValue: number;

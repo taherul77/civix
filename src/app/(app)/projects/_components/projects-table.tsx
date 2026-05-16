@@ -11,10 +11,13 @@ import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
 import { useCan } from "@/lib/auth-context";
 import { fmtAny, fmtSAR } from "@/lib/utils";
-import { toast } from "@/components/ui/toast";
 import { EditProjectModal } from "./edit-project-modal";
 import { DeleteProjectModal } from "./delete-project-modal";
+import { SendProjectModal } from "./send-project-modal";
 import type { ProjectRecord } from "@/server/contracts";
+
+/** Once a project hits one of these, it's locked from edit / delete. */
+const SENT_STATES = new Set<ProjectRecord["status"]>(["in_process", "completed"]);
 
 export function ProjectsTable() {
   const tt = useT();
@@ -26,10 +29,7 @@ export function ProjectsTable() {
 
   const [editing, setEditing] = useState<ProjectRecord | null>(null);
   const [removing, setRemoving] = useState<ProjectRecord | null>(null);
-
-  const onSend = (p: ProjectRecord) => {
-    toast.info(tt(`Send "${loc(p.name)}" — coming soon`));
-  };
+  const [sending, setSending] = useState<ProjectRecord | null>(null);
 
   const columns: ColumnDef<ProjectRecord>[] = [
     {
@@ -97,39 +97,46 @@ export function ProjectsTable() {
       key: "actions",
       header: tt("Actions"),
       align: "right",
-      cell: (p) => (
-        <div className="inline-flex items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setEditing(p); }}
-            className="p-1.5 rounded hover:bg-brand-500/10 text-brand-600 disabled:opacity-40"
-            aria-label={tt("Edit")}
-            title={tt("Edit")}
-            disabled={!canEdit}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSend(p); }}
-            className="p-1.5 rounded hover:bg-cyan-500/10 text-cyan-600"
-            aria-label={tt("Send")}
-            title={tt("Send")}
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setRemoving(p); }}
-            className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500 disabled:opacity-40"
-            aria-label={tt("Delete")}
-            title={tt("Delete")}
-            disabled={!canDelete}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
+      cell: (p) => {
+        // Visual affordance only — the actual rules (inactive must reactivate,
+        // already-sent can't resend, etc.) live on the backend and surface via
+        // toast when the user clicks. Frontend just disables when locked.
+        const isLocked = SENT_STATES.has(p.status);
+        return (
+          <div className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setEditing(p); }}
+              className="p-1.5 rounded hover:bg-brand-500/10 text-brand-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label={tt("Edit")}
+              title={tt("Edit")}
+              disabled={!canEdit || isLocked}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSending(p); }}
+              className="p-1.5 rounded hover:bg-cyan-500/10 text-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label={tt("Send")}
+              title={tt("Send to samples")}
+              disabled={isLocked}
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setRemoving(p); }}
+              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label={tt("Delete")}
+              title={tt("Delete")}
+              disabled={!canDelete || isLocked}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -162,6 +169,14 @@ export function ProjectsTable() {
           open
           project={removing}
           onClose={() => setRemoving(null)}
+        />
+      )}
+
+      {sending && (
+        <SendProjectModal
+          open
+          project={sending}
+          onClose={() => setSending(null)}
         />
       )}
     </>

@@ -457,6 +457,18 @@ export const projects = {
     await apiFetch(`/v1/operations/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
     invalidate("projects", "samples", "tests", "dashboard");
   },
+
+  /** POST /v1/operations/projects/:id/send — push into sample workflow. */
+  async send(id: string): Promise<ProjectRecord> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiProject>(
+      `/v1/operations/projects/${encodeURIComponent(id)}/send`,
+      { method: "POST", body: {} },
+    );
+    invalidate("projects", "dashboard");
+    return projectFromApi(row);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -484,11 +496,14 @@ export const samples = {
   async create(input: CreateSampleInput): Promise<SampleRecord> {
     await tick();
     requireBackend();
+    const trimmedCode = (input.code ?? "").trim();
     const row = await apiFetch<ApiSample>("/v1/operations/samples", {
       method: "POST",
       body: {
         projectId:      input.projectId,
-        sampleCode:     input.code,
+        // Omit sampleCode entirely so the backend auto-generates SMP-YYYY-NNN
+        // when the user didn't supply one.
+        ...(trimmedCode ? { sampleCode: trimmedCode } : {}),
         sampleType:     input.type,
         sampleDate:     new Date(input.date).toISOString(),
         sampledBy:      locStr(input.sampledBy),
