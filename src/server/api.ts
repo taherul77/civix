@@ -1201,7 +1201,67 @@ export const departments = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Clients (master setup)
+// ---------------------------------------------------------------------------
+
+export interface ApiClient {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  vatNumber: string | null;
+  crNumber: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const clients = {
+  async list(): Promise<ApiClient[]> {
+    await tick();
+    requireBackend();
+    const out = await apiFetch<{ items: ApiClient[]; total: number }>("/v1/clients");
+    return out.items;
+  },
+  async get(id: string): Promise<ApiClient> {
+    await tick();
+    requireBackend();
+    return apiFetch<ApiClient>(`/v1/clients/${encodeURIComponent(id)}`);
+  },
+  async create(input: Partial<ApiClient> & { code: string; name: string }): Promise<ApiClient> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiClient>("/v1/clients", { method: "POST", body: input });
+    invalidate("clients");
+    return row;
+  },
+  async update(id: string, patch: Partial<ApiClient>): Promise<ApiClient> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiClient>(`/v1/clients/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: patch,
+    });
+    invalidate("clients");
+    return row;
+  },
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/clients/${encodeURIComponent(id)}`, { method: "DELETE" });
+    invalidate("clients");
+  },
+};
+
 // Single-namespace export so call sites read `api.tests.list(...)`.
 export const api = {
-  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles, departments,
+  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles, departments, clients,
 };

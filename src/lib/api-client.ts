@@ -52,7 +52,12 @@ function buildUrl(path: string, query?: FetchOpts["query"]): string {
 }
 
 export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T> {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  // Only declare a JSON content-type when there's actually a body. Fastify v5
+  // rejects empty JSON bodies (FST_ERR_CTP_EMPTY_JSON_BODY), so DELETE / GET
+  // requests with no body must NOT send `Content-Type: application/json`.
+  const hasBody = opts.body !== undefined;
+  const headers: Record<string, string> = {};
+  if (hasBody) headers["content-type"] = "application/json";
   if (!opts.noAuth) {
     const token = useApp.getState().apiToken;
     if (token) headers.authorization = `Bearer ${token}`;
@@ -60,7 +65,7 @@ export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T
   const res = await fetch(buildUrl(path, opts.query), {
     method: opts.method ?? "GET",
     headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    body: hasBody ? JSON.stringify(opts.body) : undefined,
     cache: "no-store",
   });
   const text = await res.text();

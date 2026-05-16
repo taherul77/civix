@@ -7,6 +7,7 @@ import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
 import { Modal, Field } from "@/components/ui/modal";
 import { useCan } from "@/lib/auth-context";
+import { ClientSelect } from "./client-select";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const autoCode = () => `PRJ-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
@@ -81,7 +82,7 @@ export function NewProjectButton() {
             </select>
           </Field>
           <Field label={tt("Client")}>
-            <input className="input" value={client} onChange={(e) => setClient(e.target.value)} />
+            <ClientSelect value={client} onChange={setClient} />
           </Field>
           <Field label={tt("City")}>
             <input className="input" value={city} onChange={(e) => setCity(e.target.value)} />

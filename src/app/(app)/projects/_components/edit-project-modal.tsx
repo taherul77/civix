@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
+import { ClientSelect } from "./client-select";
 import type { ProjectRecord } from "@/server/contracts";
 
 interface Props {
@@ -99,7 +100,7 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
           </select>
         </Field>
         <Field label={tt("Client")}>
-          <input className="input" value={client} onChange={(e) => setClient(e.target.value)} />
+          <ClientSelect value={client} onChange={setClient} />
         </Field>
         <Field label={tt("City")}>
           <input className="input" value={city} onChange={(e) => setCity(e.target.value)} />

@@ -165,6 +165,13 @@ export function useInvoicesQuery(): QueryResult<InvoiceRecord[]> {
   return ok(all);
 }
 
+// ---------- Clients (master setup) ----------
+
+import type { ApiClient } from "@/server/api";
+export function useClientsQuery(): QueryResult<ApiClient[]> {
+  return useApiQuery(() => api.clients.list(), "clients");
+}
+
 // ---------- Audit ----------
 
 export function useAuditQuery(params: ListAuditParams = {}): QueryResult<AuditRecord[]> {
