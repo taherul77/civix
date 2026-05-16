@@ -52,6 +52,7 @@ import type {
   CreateEquipmentInput,
   CreateInvoiceInput,
   CreateProjectInput,
+  UpdateProjectInput,
   CreateSampleInput,
   CreateTestInput,
   DashboardStats,
@@ -421,6 +422,36 @@ export const projects = {
     });
     invalidate("projects", "dashboard");
     return projectFromApi(row);
+  },
+
+  /** PATCH /v1/projects/:id — only the provided fields are sent. */
+  async update(id: string, patch: UpdateProjectInput): Promise<ProjectRecord> {
+    await tick();
+    requireBackend();
+    const body: Record<string, unknown> = {};
+    if (patch.code        !== undefined) body.projectCode   = patch.code;
+    if (patch.name        !== undefined) body.projectName   = locStr(patch.name);
+    if (patch.client      !== undefined) body.clientName    = locStr(patch.client);
+    if (patch.city        !== undefined) body.city          = locStr(patch.city);
+    if (patch.engineer    !== undefined) body.engineerName  = locStr(patch.engineer);
+    if (patch.startDate   !== undefined) body.startDate     = patch.startDate ? new Date(patch.startDate).toISOString() : null;
+    if (patch.endDate     !== undefined) body.endDate       = patch.endDate   ? new Date(patch.endDate).toISOString()   : null;
+    if (patch.contractValue !== undefined) body.contractValue = patch.contractValue;
+    if (patch.status      !== undefined) body.status        = patch.status;
+    const row = await apiFetch<ApiProject>(`/v1/projects/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body,
+    });
+    invalidate("projects", "dashboard");
+    return projectFromApi(row);
+  },
+
+  /** DELETE /v1/projects/:id */
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+    invalidate("projects", "samples", "tests", "dashboard");
   },
 };
 

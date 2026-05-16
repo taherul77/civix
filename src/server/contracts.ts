@@ -82,7 +82,8 @@ export interface PagedResponse<T> {
 // Mutation inputs
 // ---------------------------------------------------------------------------
 
-export type CreateProjectInput   = Omit<ProjectRecord, "id">;
+export type CreateProjectInput   = Omit<ProjectRecord, "id" | "sampleCount" | "testCount">;
+export type UpdateProjectInput   = Partial<CreateProjectInput>;
 export type CreateSampleInput    = Omit<SampleRecord, "id">;
 export type CreateTestInput      = Omit<TestRecord, "id">;
 export type CreateEquipmentInput = Omit<EquipmentRecord, "id">;

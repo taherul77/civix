@@ -5,11 +5,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, MapPin, Calendar, User } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { useProjectQuery, useSamplesQuery, useTestsQuery } from "@/server/queries";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
 import { fmtAny, fmtSAR } from "@/lib/utils";
+import type { SampleRecord, TestRecord } from "@/server/contracts";
 
 export function ProjectDetailView({ id }: { id: string }) {
   const tt = useT();
@@ -20,6 +22,33 @@ export function ProjectDetailView({ id }: { id: string }) {
   const { data: projectTests   = [] } = useTestsQuery({ projectId: id });
 
   if (!project) notFound();
+
+  const sampleCols: ColumnDef<SampleRecord>[] = [
+    { key: "code",     header: tt("Code"),     cell: (s) => <span className="font-mono text-xs">{fmtAny(s.code, lang)}</span> },
+    { key: "type",     header: tt("Type"),     cell: (s) => <span className="capitalize">{tt(s.type.charAt(0).toUpperCase() + s.type.slice(1))}</span> },
+    { key: "location", header: tt("Location"), cell: (s) => loc(s.location) },
+    { key: "date",     header: tt("Date"),     cell: (s) => fmtAny(s.date, lang) },
+    { key: "status",   header: tt("Status"),   cell: (s) => <StatusBadge value={s.status} /> },
+  ];
+
+  const testCols: ColumnDef<TestRecord>[] = [
+    { key: "code", header: tt("Code"), cell: (t) => <span className="font-mono text-xs">{fmtAny(t.code, lang)}</span> },
+    {
+      key: "test",
+      header: tt("Test"),
+      cell: (t) => (
+        <Link href={`/tests/${t.id}`} className="hover:text-brand-600 hover:underline">
+          {loc(t.name)}
+        </Link>
+      ),
+    },
+    {
+      key: "result",
+      header: tt("Result"),
+      cell: (t) => t.primaryResult ? `${fmtAny(t.primaryResult.value, lang)} ${t.primaryResult.unit}` : "—",
+    },
+    { key: "pf", header: tt("P/F"), cell: (t) => <StatusBadge value={t.passFail} /> },
+  ];
 
   return (
     <div className="space-y-6">
@@ -42,47 +71,26 @@ export function ProjectDetailView({ id }: { id: string }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <h3 className="font-semibold mb-3">{tt("Samples")} ({fmtAny(projectSamples.length, lang)})</h3>
-          <table className="civix">
-            <thead>
-              <tr><th>{tt("Code")}</th><th>{tt("Type")}</th><th>{tt("Location")}</th><th>{tt("Date")}</th><th>{tt("Status")}</th></tr>
-            </thead>
-            <tbody>
-              {projectSamples.map((s) => (
-                <tr key={s.id}>
-                  <td className="font-mono text-xs">{fmtAny(s.code, lang)}</td>
-                  <td className="capitalize">{tt(s.type.charAt(0).toUpperCase() + s.type.slice(1))}</td>
-                  <td>{loc(s.location)}</td>
-                  <td>{fmtAny(s.date, lang)}</td>
-                  <td><StatusBadge value={s.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          <h3 className="font-semibold">{tt("Samples")} ({fmtAny(projectSamples.length, lang)})</h3>
+          <DataTable
+            rows={projectSamples}
+            columns={sampleCols}
+            getRowId={(s) => s.id}
+            pageSize={10}
+            empty={tt("No samples")}
+          />
         </div>
 
-        <div className="card p-5">
-          <h3 className="font-semibold mb-3">{tt("Tests")} ({fmtAny(projectTests.length, lang)})</h3>
-          <table className="civix">
-            <thead>
-              <tr><th>{tt("Code")}</th><th>{tt("Test")}</th><th>{tt("Result")}</th><th>{tt("P/F")}</th></tr>
-            </thead>
-            <tbody>
-              {projectTests.map((t) => (
-                <tr key={t.id}>
-                  <td className="font-mono text-xs">{fmtAny(t.code, lang)}</td>
-                  <td>
-                    <Link href={`/tests/${t.id}`} className="hover:text-brand-600 hover:underline">
-                      {loc(t.name)}
-                    </Link>
-                  </td>
-                  <td>{t.primaryResult ? `${fmtAny(t.primaryResult.value, lang)} ${t.primaryResult.unit}` : "—"}</td>
-                  <td><StatusBadge value={t.passFail} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          <h3 className="font-semibold">{tt("Tests")} ({fmtAny(projectTests.length, lang)})</h3>
+          <DataTable
+            rows={projectTests}
+            columns={testCols}
+            getRowId={(t) => t.id}
+            pageSize={10}
+            empty={tt("No tests")}
+          />
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { useUsersQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
@@ -15,7 +16,7 @@ import type { UserRecord } from "@/server/contracts";
 
 export function UsersTable() {
   const tt = useT();
-  const { data: users = [], refetch } = useUsersQuery();
+  const { data: users = [], isLoading, error } = useUsersQuery();
   const mfa = useApp((s) => s.mfa);
   const canUpdate = useCan("user:update");
   const canDelete = useCan("user:delete");
@@ -24,92 +25,117 @@ export function UsersTable() {
   const [editing, setEditing] = useState<UserRecord | null>(null);
   const [removing, setRemoving] = useState<UserRecord | null>(null);
 
+  const userRoles = (u: UserRecord) =>
+    u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : []);
+
+  const columns: ColumnDef<UserRecord>[] = [
+    {
+      key: "name",
+      header: tt("Name"),
+      cell: (u) => <span className="font-medium">{u.name}</span>,
+      sort: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      key: "email",
+      header: tt("Email"),
+      cell: (u) => <span className="text-sm">{u.email}</span>,
+      sort: (a, b) => a.email.localeCompare(b.email),
+    },
+    {
+      key: "phone",
+      header: tt("Phone"),
+      cell: (u) => <span className="text-sm !whitespace-nowrap">{u.phone ?? "—"}</span>,
+    },
+    {
+      key: "roles",
+      header: tt("Role"),
+      cell: (u) => (
+        <div className="flex flex-wrap gap-1">
+          {userRoles(u).map((r) => (
+            <span
+              key={r}
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-[rgb(var(--bg-soft))] border border-[rgb(var(--border))]"
+            >
+              {r}
+            </span>
+          ))}
+        </div>
+      ),
+      sort: (a, b) => (userRoles(a)[0] ?? "").localeCompare(userRoles(b)[0] ?? ""),
+    },
+    {
+      key: "dept",
+      header: tt("Department"),
+      cell: (u) => u.dept,
+      sort: (a, b) => (a.dept ?? "").localeCompare(b.dept ?? ""),
+    },
+    {
+      key: "mfa",
+      header: tt("MFA"),
+      cell: (u) => (u.mfa || mfa[u.email])
+        ? <span className="badge badge-pass">Enabled</span>
+        : <span className="badge badge-warn">Disabled</span>,
+    },
+    {
+      key: "status",
+      header: tt("Status"),
+      cell: (u) => <StatusBadge value={u.status} />,
+      sort: (a, b) => String(a.status).localeCompare(String(b.status)),
+    },
+    ...((canUpdate || canDelete) ? [{
+      key: "actions",
+      header: tt("Actions"),
+      align: "right" as const,
+      cell: (u: UserRecord) => (
+        <div className="inline-flex items-center gap-1">
+          {canUpdate && (
+            <button
+              type="button"
+              onClick={() => setEditing(u)}
+              className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
+              title={tt("Edit")}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => setRemoving(u)}
+              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
+              title={tt("Remove from this company")}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      ),
+    }] : []),
+  ];
+
   return (
-    <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="civix">
-          <thead>
-            <tr>
-              <th>{tt("Name")}</th>
-              <th>{tt("Email")}</th>
-              <th>{tt("Phone")}</th>
-              <th>{tt("Role")}</th>
-              <th>{tt("Department")}</th>
-              <th>{tt("MFA")}</th>
-              <th>{tt("Status")}</th>
-              {(canUpdate || canDelete) && <th className="text-right">{tt("Actions")}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td className="font-medium">{u.name}</td>
-                <td className="text-sm">{u.email}</td>
-                <td className="text-sm !whitespace-nowrap">{u.phone ?? "—"}</td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {(u.roles && u.roles.length > 0 ? u.roles : (u.role ? [u.role] : [])).map((r) => (
-                      <span
-                        key={r}
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-[rgb(var(--bg-soft))] border border-[rgb(var(--border))]"
-                      >
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td>{u.dept}</td>
-                <td>
-                  {(u.mfa || mfa[u.email])
-                    ? <span className="badge badge-pass">Enabled</span>
-                    : <span className="badge badge-warn">Disabled</span>}
-                </td>
-                <td><StatusBadge value={u.status} /></td>
-                {(canUpdate || canDelete) && (
-                  <td className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {canUpdate && (
-                        <button
-                          type="button"
-                          onClick={() => setEditing(u)}
-                          className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                          title={tt("Edit")}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button
-                          type="button"
-                          onClick={() => setRemoving(u)}
-                          className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
-                          title={tt("Remove from this company")}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center text-sm text-[rgb(var(--muted))] py-8">
-                  {tt("No users yet — invite the first one.")}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <>
+      <DataTable
+        rows={users}
+        columns={columns}
+        getRowId={(u) => u.id}
+        loading={isLoading}
+        error={error?.message ?? null}
+        searchable
+        searchPlaceholder={tt("Search users…")}
+        searchFilter={(u, q) =>
+          [u.name, u.email, u.phone ?? "", u.dept ?? "", ...userRoles(u)]
+            .join(" ").toLowerCase().includes(q)
+        }
+        empty={tt("No users yet — invite the first one.")}
+      />
 
       {editing && (
         <EditUserModal
           user={editing}
           isSuperAdmin={isSuperAdmin}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); refetch?.(); }}
+          onSaved={() => { setEditing(null); }}
         />
       )}
 
@@ -117,10 +143,10 @@ export function UsersTable() {
         <RemoveUserModal
           user={removing}
           onClose={() => setRemoving(null)}
-          onRemoved={() => { setRemoving(null); refetch?.(); }}
+          onRemoved={() => { setRemoving(null); }}
         />
       )}
-    </div>
+    </>
   );
 }
 

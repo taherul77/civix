@@ -46,6 +46,11 @@ export interface ApiProject {
   endDate?: string | null;
   contractValue?: string | number | null;
   status: string;
+  // Aggregates computed by the backend so the projects table doesn't have to
+  // load every sample/test row just to render two counts. Optional so older
+  // payloads still parse.
+  sampleCount?: number | null;
+  testCount?: number | null;
 }
 
 export function projectFromApi(p: ApiProject): Project {
@@ -60,6 +65,8 @@ export function projectFromApi(p: ApiProject): Project {
     startDate: isoDate(p.startDate),
     endDate: isoDate(p.endDate),
     contractValue: typeof p.contractValue === "string" ? Number(p.contractValue) : (p.contractValue ?? 0),
+    sampleCount: p.sampleCount ?? undefined,
+    testCount:   p.testCount   ?? undefined,
   };
 }
 

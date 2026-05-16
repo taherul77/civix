@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Plus, ShieldCheck, Loader2, Users as UsersIcon, RefreshCw, LogIn, Eye, Pencil, Trash2, UserCog } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Modal, Field } from "@/components/ui/modal";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
 import { apiFetch, isBackendActive } from "@/lib/api-client";
@@ -110,112 +111,103 @@ export default function SuperAdminPage() {
       </div>
 
       {/* Tenant list */}
-      <div className="card p-0 overflow-hidden">
-        {loading ? (
-          <div className="p-10 grid place-items-center text-sm text-[rgb(var(--muted))]">
-            <Loader2 className="w-5 h-5 animate-spin mb-2" />
-            {tt("Loading companies…")}
-          </div>
-        ) : error ? (
-          <div className="p-6 text-sm text-rose-600">{error}</div>
-        ) : tenants.length === 0 ? (
-          <div className="p-10 text-center text-sm text-[rgb(var(--muted))]">
-            {tt("No companies yet. Click \"Create company\" to add the first one.")}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[rgb(var(--bg-soft))]">
-                <tr>
-                  <th className="text-left px-4 py-2 font-semibold">{tt("Company")}</th>
-                  <th className="text-left px-4 py-2 font-semibold">{tt("Subdomain")}</th>
-                  <th className="text-left px-4 py-2 font-semibold">{tt("Tier")}</th>
-                  <th className="text-left px-4 py-2 font-semibold">{tt("Members")}</th>
-                  <th className="text-left px-4 py-2 font-semibold">{tt("Created")}</th>
-                  <th className="text-right px-4 py-2 font-semibold">{tt("Action")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenants.map((t) => (
-                  <tr key={t.id} className="border-t border-[rgb(var(--border))] hover:bg-[rgb(var(--bg-soft))]">
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{t.name}</div>
-                      <div className="text-[10px] text-[rgb(var(--muted))] font-mono">{t.id}</div>
-                    </td>
-                    <td className="px-4 py-2 font-mono">{t.subdomain}.civixlab.com</td>
-                    <td className="px-4 py-2 capitalize">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-                        t.subscriptionTier === "enterprise"   ? "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" :
-                        t.subscriptionTier === "professional" ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" :
-                        "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300"
-                      }`}>{t.subscriptionTier}</span>
-                    </td>
-                    <td className="px-4 py-2 font-mono">
-                      <button
-                        type="button"
-                        onClick={() => setShowingMembers(t)}
-                        className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-[rgb(var(--bg-soft))] underline-offset-2 hover:underline"
-                        title={tt("Show members")}
-                      >
-                        <UsersIcon className="w-3.5 h-3.5 text-[rgb(var(--muted))]" />
-                        {t.memberCount}
-                      </button>
-                    </td>
-                    <td className="px-4 py-2 text-[rgb(var(--muted))]">{new Date(t.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setViewing(t)}
-                          className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                          title={tt("View")}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowingMembers(t)}
-                          className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                          title={tt("Members")}
-                        >
-                          <UserCog className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditing(t)}
-                          className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                          title={tt("Edit")}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRemoving(t)}
-                          className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
-                          title={tt("Delete")}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onEnter(t)}
-                          disabled={enteringId === t.id}
-                          className="btn btn-outline text-xs ml-1"
-                          title={tt("Enter this company as Super Admin")}
-                        >
-                          {enteringId === t.id
-                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {tt("Entering…")}</>
-                            : <><LogIn className="w-3.5 h-3.5" /> {tt("Enter")}</>}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTable
+        rows={tenants}
+        getRowId={(t) => t.id}
+        loading={loading}
+        error={error}
+        searchable
+        searchPlaceholder={tt("Search companies…")}
+        searchFilter={(t, q) =>
+          [t.name, t.id, t.subdomain, t.subscriptionTier].join(" ").toLowerCase().includes(q)
+        }
+        empty={tt("No companies yet. Click \"Create company\" to add the first one.")}
+        columns={[
+          {
+            key: "company",
+            header: tt("Company"),
+            cell: (t) => (
+              <>
+                <div className="font-medium">{t.name}</div>
+                <div className="text-[10px] text-[rgb(var(--muted))] font-mono">{t.id}</div>
+              </>
+            ),
+            sort: (a, b) => a.name.localeCompare(b.name),
+          },
+          {
+            key: "subdomain",
+            header: tt("Subdomain"),
+            cell: (t) => <span className="font-mono">{t.subdomain}.civixlab.com</span>,
+            sort: (a, b) => a.subdomain.localeCompare(b.subdomain),
+          },
+          {
+            key: "tier",
+            header: tt("Tier"),
+            cell: (t) => (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs capitalize ${
+                t.subscriptionTier === "enterprise"   ? "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" :
+                t.subscriptionTier === "professional" ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" :
+                "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300"
+              }`}>{t.subscriptionTier}</span>
+            ),
+            sort: (a, b) => a.subscriptionTier.localeCompare(b.subscriptionTier),
+          },
+          {
+            key: "members",
+            header: tt("Members"),
+            cell: (t) => (
+              <button
+                type="button"
+                onClick={() => setShowingMembers(t)}
+                className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-[rgb(var(--bg-soft))] underline-offset-2 hover:underline font-mono"
+                title={tt("Show members")}
+              >
+                <UsersIcon className="w-3.5 h-3.5 text-[rgb(var(--muted))]" />
+                {t.memberCount}
+              </button>
+            ),
+            sort: (a, b) => a.memberCount - b.memberCount,
+          },
+          {
+            key: "createdAt",
+            header: tt("Created"),
+            cell: (t) => <span className="text-[rgb(var(--muted))]">{new Date(t.createdAt).toLocaleDateString()}</span>,
+            sort: (a, b) => a.createdAt.localeCompare(b.createdAt),
+          },
+          {
+            key: "actions",
+            header: tt("Action"),
+            align: "right",
+            cell: (t) => (
+              <div className="inline-flex items-center gap-1">
+                <button type="button" onClick={() => setViewing(t)} className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]" title={tt("View")}>
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => setShowingMembers(t)} className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]" title={tt("Members")}>
+                  <UserCog className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => setEditing(t)} className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]" title={tt("Edit")}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" onClick={() => setRemoving(t)} className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500" title={tt("Delete")}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onEnter(t)}
+                  disabled={enteringId === t.id}
+                  className="btn btn-outline text-xs ml-1"
+                  title={tt("Enter this company as Super Admin")}
+                >
+                  {enteringId === t.id
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {tt("Entering…")}</>
+                    : <><LogIn className="w-3.5 h-3.5" /> {tt("Enter")}</>}
+                </button>
+              </div>
+            ),
+          },
+        ] as ColumnDef<SuperTenant>[]}
+      />
 
       <CreateCompanyModal
         open={showCreate}

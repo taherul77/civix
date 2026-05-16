@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, Shield } from "lucide-react";
+import { useMemo } from "react";
+import { Shield } from "lucide-react";
 import { audit as seedAudit } from "@/lib/mock-extra";
 import { useAuditQuery } from "@/server/queries";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 
 const actionTone: Record<string, string> = {
   create: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
@@ -18,10 +19,21 @@ const actionTone: Record<string, string> = {
   calibration: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
 };
 
+interface AuditRow {
+  id: string;
+  ts: string;
+  user: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  diff?: Array<{ field: string; from: unknown; to: unknown }>;
+  ip?: string;
+}
+
 export function AuditLogExplorer() {
   const tt = useT();
-  const { data: liveAudit = [] } = useAuditQuery();
-  const merged = useMemo(
+  const { data: liveAudit = [], isLoading, error } = useAuditQuery();
+  const merged: AuditRow[] = useMemo(
     () => [
       ...liveAudit.map((a) => ({
         id: a.id,
@@ -37,67 +49,79 @@ export function AuditLogExplorer() {
     ],
     [liveAudit]
   );
-  const [q, setQ] = useState("");
-  const filtered = useMemo(
-    () => merged.filter((a) => !q || `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q.toLowerCase())),
-    [merged, q]
+
+  const columns: ColumnDef<AuditRow>[] = [
+    {
+      key: "ts",
+      header: tt("Timestamp"),
+      cell: (a) => <span className="font-mono text-xs whitespace-nowrap">{a.ts}</span>,
+      sort: (a, b) => a.ts.localeCompare(b.ts),
+    },
+    {
+      key: "user",
+      header: tt("User"),
+      cell: (a) => <span className="font-medium">{a.user}</span>,
+      sort: (a, b) => a.user.localeCompare(b.user),
+    },
+    {
+      key: "action",
+      header: tt("Action"),
+      cell: (a) => <span className={cn("badge capitalize", actionTone[a.action])}>{a.action}</span>,
+      sort: (a, b) => a.action.localeCompare(b.action),
+    },
+    {
+      key: "entity",
+      header: tt("Entity"),
+      cell: (a) => a.entity,
+      sort: (a, b) => a.entity.localeCompare(b.entity),
+    },
+    {
+      key: "entityId",
+      header: tt("Entity ID"),
+      cell: (a) => <span className="font-mono text-xs">{a.entityId}</span>,
+    },
+    {
+      key: "diff",
+      header: tt("Diff"),
+      cell: (a) => (
+        <div className="text-xs">
+          {a.diff ? a.diff.map((d) => (
+            <div key={d.field} className="font-mono">
+              <span className="text-[rgb(var(--muted))]">{d.field}:</span>{" "}
+              <span className="text-rose-600 line-through">{String(d.from)}</span>{" → "}
+              <span className="text-emerald-600">{String(d.to)}</span>
+            </div>
+          )) : <span className="text-[rgb(var(--muted))]">—</span>}
+        </div>
+      ),
+    },
+    {
+      key: "ip",
+      header: tt("IP"),
+      cell: (a) => <span className="font-mono text-xs">{a.ip}</span>,
+    },
+  ];
+
+  const toolbar = (
+    <div className="flex items-center gap-1 text-xs text-[rgb(var(--muted))]">
+      <Shield className="w-3.5 h-3.5" /> {tt("Tamper-evident · SHA-256 chained")}
+    </div>
   );
 
   return (
-    <>
-      <div className="card p-3 flex items-center gap-2">
-        <Search className="w-4 h-4 text-[rgb(var(--muted))] mx-2" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={tt("Search by user, entity, action...")}
-          className="input flex-1"
-        />
-        <div className="flex items-center gap-1 text-xs text-[rgb(var(--muted))] px-2">
-          <Shield className="w-3.5 h-3.5" /> {tt("Tamper-evident · SHA-256 chained")}
-        </div>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="civix">
-            <thead>
-              <tr>
-                <th>{tt("Timestamp")}</th>
-                <th>{tt("User")}</th>
-                <th>{tt("Action")}</th>
-                <th>{tt("Entity")}</th>
-                <th>{tt("Entity ID")}</th>
-                <th>{tt("Diff")}</th>
-                <th>{tt("IP")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((a) => (
-                <tr key={a.id}>
-                  <td className="font-mono text-xs whitespace-nowrap">{a.ts}</td>
-                  <td className="font-medium">{a.user}</td>
-                  <td>
-                    <span className={cn("badge capitalize", actionTone[a.action])}>{a.action}</span>
-                  </td>
-                  <td>{a.entity}</td>
-                  <td className="font-mono text-xs">{a.entityId}</td>
-                  <td className="text-xs">
-                    {a.diff ? a.diff.map((d) => (
-                      <div key={d.field} className="font-mono">
-                        <span className="text-[rgb(var(--muted))]">{d.field}:</span>{" "}
-                        <span className="text-rose-600 line-through">{d.from}</span>{" → "}
-                        <span className="text-emerald-600">{d.to}</span>
-                      </div>
-                    )) : <span className="text-[rgb(var(--muted))]">—</span>}
-                  </td>
-                  <td className="font-mono text-xs">{a.ip}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </>
+    <DataTable
+      rows={merged}
+      columns={columns}
+      getRowId={(a) => a.id}
+      loading={isLoading}
+      error={error?.message ?? null}
+      searchable
+      searchPlaceholder={tt("Search by user, entity, action…")}
+      searchFilter={(a, q) =>
+        `${a.user} ${a.action} ${a.entity} ${a.entityId}`.toLowerCase().includes(q)
+      }
+      toolbar={toolbar}
+      empty={tt("No audit events")}
+    />
   );
 }

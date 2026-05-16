@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, Eye, Building2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Modal, Field } from "@/components/ui/modal";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { useT } from "@/lib/i18n";
 import { useCan } from "@/lib/auth-context";
 import { useApp } from "@/store/app-store";
@@ -120,98 +121,110 @@ export default function RoleSetupPage() {
       )}
 
       {/* Roles table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="civix">
-            <thead>
-              <tr>
-                <th>{tt("Role")}</th>
-                <th>{tt("Type")}</th>
-                <th>{tt("Permissions")}</th>
-                <th>{tt("Created")}</th>
-                <th>{tt("Updated")}</th>
-                <th className="text-right">{tt("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roles.map((r) => {
-                const isProtected = PROTECTED_NAMES.has(r.name);
-                return (
-                  <tr key={r.id}>
-                    <td className="font-medium">{r.name}</td>
-                    <td>
-                      {r.isCustom ? (
-                        <span className="badge bg-violet-500/10 text-violet-600 dark:text-violet-300">
-                          {tt("Custom")}
-                        </span>
-                      ) : (
-                        <span className="badge bg-slate-500/10 text-slate-600 dark:text-slate-300">
-                          {tt("Built-in")}
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-sm font-mono">{r.permissions.length}</td>
-                    <td className="text-xs">
-                      <div>{formatDateTime(r.createdAt)}</div>
-                      {r.createdBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {r.createdBy}</div>}
-                    </td>
-                    <td className="text-xs">
-                      <div>{formatDateTime(r.updatedAt)}</div>
-                      {r.updatedBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {r.updatedBy}</div>}
-                    </td>
-                    <td className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setViewing(r)}
-                          className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                          title={tt("View")}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        {canEdit && !isProtected && (
-                          <button
-                            type="button"
-                            onClick={() => setEditing(r)}
-                            className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
-                            title={tt("Edit")}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {canEdit && !isProtected && (
-                          <button
-                            type="button"
-                            onClick={() => setRemoving(r)}
-                            className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
-                            title={tt("Delete")}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {isProtected && (
-                          <span className="text-[10px] text-[rgb(var(--muted))] uppercase tracking-wider px-2">
-                            {tt("Protected")}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {roles.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center text-sm text-[rgb(var(--muted))] py-8">
-                    {isSuperAdmin && !tenantId
-                      ? tt("Pick a company to view its roles.")
-                      : tt("No roles yet — add the first one.")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        rows={roles}
+        getRowId={(r) => r.id}
+        searchable
+        searchPlaceholder={tt("Search roles…")}
+        searchFilter={(r, q) => r.name.toLowerCase().includes(q)}
+        empty={
+          isSuperAdmin && !tenantId
+            ? tt("Pick a company to view its roles.")
+            : tt("No roles yet — add the first one.")
+        }
+        columns={[
+          {
+            key: "name",
+            header: tt("Role"),
+            cell: (r) => <span className="font-medium">{r.name}</span>,
+            sort: (a, b) => a.name.localeCompare(b.name),
+          },
+          {
+            key: "type",
+            header: tt("Type"),
+            cell: (r) => r.isCustom ? (
+              <span className="badge bg-violet-500/10 text-violet-600 dark:text-violet-300">{tt("Custom")}</span>
+            ) : (
+              <span className="badge bg-slate-500/10 text-slate-600 dark:text-slate-300">{tt("Built-in")}</span>
+            ),
+            sort: (a, b) => Number(b.isCustom) - Number(a.isCustom),
+          },
+          {
+            key: "permissions",
+            header: tt("Permissions"),
+            cell: (r) => <span className="text-sm font-mono">{r.permissions.length}</span>,
+            sort: (a, b) => a.permissions.length - b.permissions.length,
+            align: "right",
+          },
+          {
+            key: "created",
+            header: tt("Created"),
+            cell: (r) => (
+              <div className="text-xs">
+                <div>{formatDateTime(r.createdAt)}</div>
+                {r.createdBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {r.createdBy}</div>}
+              </div>
+            ),
+            sort: (a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
+          },
+          {
+            key: "updated",
+            header: tt("Updated"),
+            cell: (r) => (
+              <div className="text-xs">
+                <div>{formatDateTime(r.updatedAt)}</div>
+                {r.updatedBy && <div className="text-[rgb(var(--muted))]">{tt("by")} {r.updatedBy}</div>}
+              </div>
+            ),
+            sort: (a, b) => (a.updatedAt ?? "").localeCompare(b.updatedAt ?? ""),
+          },
+          {
+            key: "actions",
+            header: tt("Actions"),
+            align: "right",
+            cell: (r) => {
+              const isProtected = PROTECTED_NAMES.has(r.name);
+              return (
+                <div className="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewing(r)}
+                    className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
+                    title={tt("View")}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                  {canEdit && !isProtected && (
+                    <button
+                      type="button"
+                      onClick={() => setEditing(r)}
+                      className="p-1.5 rounded hover:bg-[rgb(var(--bg-soft))]"
+                      title={tt("Edit")}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {canEdit && !isProtected && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoving(r)}
+                      className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500"
+                      title={tt("Delete")}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {isProtected && (
+                    <span className="text-[10px] text-[rgb(var(--muted))] uppercase tracking-wider px-2">
+                      {tt("Protected")}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          },
+        ] as ColumnDef<ApiRole>[]}
+      />
 
       {!canEdit && (
         <div className="text-xs text-amber-600 dark:text-amber-400">

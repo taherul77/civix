@@ -13,6 +13,9 @@ export interface Project {
   startDate: string;
   endDate: string;
   contractValue: number;
+  /** Provided by the backend on /v1/projects list payload. */
+  sampleCount?: number;
+  testCount?: number;
 }
 
 export interface Sample {

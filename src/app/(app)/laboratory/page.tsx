@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FlaskConical, Plus, RefreshCw, Loader2 } from "lucide-react";
+import { FlaskConical, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { useT } from "@/lib/i18n";
 import { useCan } from "@/lib/auth-context";
@@ -86,36 +86,29 @@ export default function LaboratorySetupPage() {
         }
       />
 
-      <div className="card p-0 overflow-hidden">
-        {loading ? (
-          <div className="p-10 grid place-items-center text-sm text-[rgb(var(--muted))]">
-            <Loader2 className="w-5 h-5 animate-spin mb-2" />
-            {tt("Loading laboratories…")}
+      <LaboratoryTable
+        labs={labs}
+        loading={loading}
+        error={error}
+        canEdit={canEdit}
+        onEdit={(lab) => setEditing(lab)}
+        onDelete={onDelete}
+      />
+
+      {!loading && !error && labs.length === 0 && (
+        <div className="card p-12 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-brand-gradient grid place-items-center text-white mx-auto mb-3">
+            <FlaskConical className="w-6 h-6" />
           </div>
-        ) : error ? (
-          <div className="p-6 text-sm text-rose-600">{error}</div>
-        ) : labs.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-brand-gradient grid place-items-center text-white mx-auto mb-3">
-              <FlaskConical className="w-6 h-6" />
-            </div>
-            <div className="font-semibold mb-1">{tt("No laboratories yet")}</div>
-            <div className="text-sm text-[rgb(var(--muted))] mb-4">
-              {tt("Add your first lab to start linking tests, samples, and reports to it.")}
-            </div>
-            <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!canEdit}>
-              <Plus className="w-4 h-4" /> {tt("Create first laboratory")}
-            </button>
+          <div className="font-semibold mb-1">{tt("No laboratories yet")}</div>
+          <div className="text-sm text-[rgb(var(--muted))] mb-4">
+            {tt("Add your first lab to start linking tests, samples, and reports to it.")}
           </div>
-        ) : (
-          <LaboratoryTable
-            labs={labs}
-            canEdit={canEdit}
-            onEdit={(lab) => setEditing(lab)}
-            onDelete={onDelete}
-          />
-        )}
-      </div>
+          <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!canEdit}>
+            <Plus className="w-4 h-4" /> {tt("Create first laboratory")}
+          </button>
+        </div>
+      )}
 
       <LaboratoryModal
         open={creating || !!editing}

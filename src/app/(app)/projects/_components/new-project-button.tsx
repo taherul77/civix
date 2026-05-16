@@ -15,6 +15,7 @@ export function NewProjectButton() {
   const tt = useT();
   const canCreate = useCan("project:create");
   const [open, setOpen] = useState(false);
+  // Auto-generated server-side-style code; not editable by the user.
   const [code, setCode] = useState(autoCode());
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
@@ -69,18 +70,15 @@ export function NewProjectButton() {
         }
       >
         <form id="new-project-form" onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label={tt("Code")}>
-            <input className="input" value={code} onChange={(e) => setCode(e.target.value)} required />
+          <Field label={tt("Project")} span={2}>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
           </Field>
-          <Field label={tt("Status")}>
+          <Field label={tt("Status")} span={2}>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as never)}>
               <option value="active">{tt("Active")}</option>
               <option value="on_hold">{tt("On hold")}</option>
               <option value="completed">{tt("Completed")}</option>
             </select>
-          </Field>
-          <Field label={tt("Project")} span={2}>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
           </Field>
           <Field label={tt("Client")}>
             <input className="input" value={client} onChange={(e) => setClient(e.target.value)} />
