@@ -59,6 +59,7 @@ export function projectFromApi(p: ApiProject): Project {
     code: p.projectCode,
     name: p.projectName,
     client: p.clientName ?? "",
+    clientEmail: p.clientEmail ?? null,
     city: p.city ?? "",
     engineer: p.engineerName ?? "",
     status: (["active", "on_hold", "completed"].includes(p.status) ? p.status : "active") as Project["status"],

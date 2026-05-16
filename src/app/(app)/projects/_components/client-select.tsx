@@ -5,8 +5,14 @@ import { useT } from "@/lib/i18n";
 import { useClientsQuery } from "@/server/queries";
 
 interface Props {
+  /** Currently-selected client name. */
   value: string;
-  onChange: (v: string) => void;
+  /**
+   * Fired on selection. `email` is the picked client's contactEmail (or null
+   * if that client has none) so the caller can auto-fill the project's
+   * clientEmail without a second fetch.
+   */
+  onChange: (name: string, email: string | null) => void;
   required?: boolean;
 }
 
@@ -47,7 +53,11 @@ export function ClientSelect({ value, onChange, required }: Props) {
     <select
       className="input"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        const name = e.target.value;
+        const picked = clients.find((c) => c.name === name);
+        onChange(name, picked?.contactEmail ?? null);
+      }}
       required={required}
     >
       <option value="">{tt("Select a client…")}</option>

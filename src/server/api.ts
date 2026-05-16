@@ -412,6 +412,7 @@ export const projects = {
         projectCode:  input.code,
         projectName:  locStr(input.name),
         clientName:   locStr(input.client),
+        clientEmail:  input.clientEmail ?? undefined,
         city:         locStr(input.city),
         engineerName: locStr(input.engineer),
         startDate:    input.startDate ? new Date(input.startDate).toISOString() : undefined,
@@ -432,6 +433,7 @@ export const projects = {
     if (patch.code        !== undefined) body.projectCode   = patch.code;
     if (patch.name        !== undefined) body.projectName   = locStr(patch.name);
     if (patch.client      !== undefined) body.clientName    = locStr(patch.client);
+    if (patch.clientEmail !== undefined) body.clientEmail   = patch.clientEmail ?? null;
     if (patch.city        !== undefined) body.city          = locStr(patch.city);
     if (patch.engineer    !== undefined) body.engineerName  = locStr(patch.engineer);
     if (patch.startDate   !== undefined) body.startDate     = patch.startDate ? new Date(patch.startDate).toISOString() : null;
@@ -1261,7 +1263,63 @@ export const clients = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Engineers (master setup)
+// ---------------------------------------------------------------------------
+
+export interface ApiEngineer {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  licenseNumber: string | null;
+  specialty: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const engineers = {
+  async list(): Promise<ApiEngineer[]> {
+    await tick();
+    requireBackend();
+    const out = await apiFetch<{ items: ApiEngineer[]; total: number }>("/v1/engineers");
+    return out.items;
+  },
+  async get(id: string): Promise<ApiEngineer> {
+    await tick();
+    requireBackend();
+    return apiFetch<ApiEngineer>(`/v1/engineers/${encodeURIComponent(id)}`);
+  },
+  async create(input: Partial<ApiEngineer> & { code: string; name: string }): Promise<ApiEngineer> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiEngineer>("/v1/engineers", { method: "POST", body: input });
+    invalidate("engineers");
+    return row;
+  },
+  async update(id: string, patch: Partial<ApiEngineer>): Promise<ApiEngineer> {
+    await tick();
+    requireBackend();
+    const row = await apiFetch<ApiEngineer>(`/v1/engineers/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: patch,
+    });
+    invalidate("engineers");
+    return row;
+  },
+  async remove(id: string): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/engineers/${encodeURIComponent(id)}`, { method: "DELETE" });
+    invalidate("engineers");
+  },
+};
+
 // Single-namespace export so call sites read `api.tests.list(...)`.
 export const api = {
-  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles, departments, clients,
+  auth, projects, samples, tests, equipment, users, invoices, audit, dashboard, reports, zatca, roles, departments, clients, engineers,
 };

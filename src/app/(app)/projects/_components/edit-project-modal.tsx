@@ -8,6 +8,7 @@ import { useLoc } from "@/lib/i18n-data";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
 import { ClientSelect } from "./client-select";
+import { EngineerSelect } from "./engineer-select";
 import type { ProjectRecord } from "@/server/contracts";
 
 interface Props {
@@ -23,6 +24,7 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
 
   const [name, setName] = useState(loc(project.name));
   const [client, setClient] = useState(loc(project.client));
+  const [clientEmail, setClientEmail] = useState<string | null>(project.clientEmail ?? null);
   const [city, setCity] = useState(loc(project.city));
   const [engineer, setEngineer] = useState(loc(project.engineer));
   const [status, setStatus] = useState<ProjectRecord["status"]>(project.status);
@@ -36,6 +38,7 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
     if (!open) return;
     setName(loc(project.name));
     setClient(loc(project.client));
+    setClientEmail(project.clientEmail ?? null);
     setCity(loc(project.city));
     setEngineer(loc(project.engineer));
     setStatus(project.status);
@@ -53,6 +56,7 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
       () => api.projects.update(project.id, {
         name: name.trim(),
         client: client.trim(),
+        clientEmail: clientEmail ?? null,
         city: city.trim(),
         engineer: engineer.trim(),
         status,
@@ -100,13 +104,19 @@ export function EditProjectModal({ open, project, onClose, onSaved }: Props) {
           </select>
         </Field>
         <Field label={tt("Client")}>
-          <ClientSelect value={client} onChange={setClient} />
+          <ClientSelect
+            value={client}
+            onChange={(n, e) => { setClient(n); setClientEmail(e); }}
+          />
+          {clientEmail && (
+            <div className="text-[10px] text-[rgb(var(--muted))] mt-1 font-mono">{clientEmail}</div>
+          )}
         </Field>
         <Field label={tt("City")}>
           <input className="input" value={city} onChange={(e) => setCity(e.target.value)} />
         </Field>
         <Field label={tt("Engineer")} span={2}>
-          <input className="input" value={engineer} onChange={(e) => setEngineer(e.target.value)} />
+          <EngineerSelect value={engineer} onChange={setEngineer} />
         </Field>
         <Field label={tt("Date") + " (start)"}>
           <input type="date" className="input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />

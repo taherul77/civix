@@ -31,6 +31,7 @@ import {
   UsersRound,
   Crown,
   Briefcase,
+  HardHat,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
 import { t, useT, type DictKey } from "@/lib/i18n";
@@ -125,6 +126,7 @@ const groups: { title: string; items: NavItem[] }[] = [
           { href: "/laboratory", key: "laboratory", label: "Laboratory setup", icon: FlaskConical },
           { href: "/departments", key: "departments", label: "Department setup", icon: UsersRound },
           { href: "/clients",    key: "clients",    label: "Client setup",     icon: Briefcase },
+          { href: "/engineers",  key: "engineers",  label: "Engineer setup",   icon: HardHat },
         ],
       },
       {

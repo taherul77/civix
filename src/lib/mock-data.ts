@@ -7,6 +7,8 @@ export interface Project {
   code: string;
   name: LocStr;
   client: LocStr;
+  /** Auto-filled from the selected client in the picker. */
+  clientEmail?: string | null;
   city: LocStr;
   engineer: LocStr;
   status: "active" | "on_hold" | "completed";

@@ -167,9 +167,15 @@ export function useInvoicesQuery(): QueryResult<InvoiceRecord[]> {
 
 // ---------- Clients (master setup) ----------
 
-import type { ApiClient } from "@/server/api";
+import type { ApiClient, ApiEngineer } from "@/server/api";
 export function useClientsQuery(): QueryResult<ApiClient[]> {
   return useApiQuery(() => api.clients.list(), "clients");
+}
+
+// ---------- Engineers (master setup) ----------
+
+export function useEngineersQuery(): QueryResult<ApiEngineer[]> {
+  return useApiQuery(() => api.engineers.list(), "engineers");
 }
 
 // ---------- Audit ----------
