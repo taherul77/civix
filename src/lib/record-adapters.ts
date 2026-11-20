@@ -90,6 +90,7 @@ export interface ApiSample {
   sampleDate: string;
   sampledBy?: string | null;
   sampleLocation?: string | null;
+  gpsCoordinates?: string | null;
   status: string;
 }
 
@@ -107,7 +108,18 @@ export function sampleFromApi(s: ApiSample): Sample {
     location: s.sampleLocation ?? "",
     sampledBy: s.sampledBy ?? "",
     status,
+    gps: parseGps(s.gpsCoordinates),
   };
+}
+
+/** Accepts "lat,lng" or "(lat,lng)" (Postgres POINT text). Rejects out-of-range values. */
+export function parseGps(raw: string | null | undefined): { lat: number; lng: number } | null {
+  if (!raw) return null;
+  const m = raw.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?\s*$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
 }
 
 // ---------------------------------------------------------------------------

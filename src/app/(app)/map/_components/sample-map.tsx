@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
-import type { sitesGeo as SeedSites } from "@/lib/mock-extra";
+import { useSamplesQuery } from "@/server/queries";
+import { useLoc } from "@/lib/i18n-data";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -30,14 +31,26 @@ const typeColor: Record<string, string> = {
   Water: "#0891b2",
 };
 
-// Samples do not carry GPS coordinates yet, so there is nothing real to plot.
-// (Seed pins were removed; wire this to sample.gps once field capture stores it.)
-type Site = (typeof SeedSites)[number];
-const sitesGeo: Site[] = [];
+interface Site { id: string; code: string; type: string; lat: number; lng: number; city: string; date: string }
+
+const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
 
 export function SampleMap() {
   const tt = useT();
+  const loc = useLoc();
+  const { data: samples = [] } = useSamplesQuery({});
   const [hovered, setHovered] = useState<Site | null>(null);
+
+  // Real samples that carry GPS. Points outside the map frame are still listed.
+  const sitesGeo = useMemo<Site[]>(
+    () => samples
+      .filter((s) => s.gps)
+      .map((s) => ({
+        id: s.id, code: s.code, type: cap(s.type), lat: s.gps!.lat, lng: s.gps!.lng,
+        city: loc(s.location), date: s.date,
+      })),
+    [samples, loc],
+  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -33,6 +33,8 @@ export interface Sample {
   location: LocStr;
   sampledBy: LocStr;
   status: "pending" | "in_test" | "completed";
+  /** Parsed from the stored "lat,lng" string; null when the sample has no GPS. */
+  gps?: { lat: number; lng: number } | null;
 }
 
 export interface Test {
