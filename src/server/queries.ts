@@ -188,6 +188,10 @@ export function useAuditQuery(params: ListAuditParams = {}): QueryResult<AuditRe
 
 // ---------- Dashboard aggregate ----------
 
+export function useReportStatusQuery(testId: string): QueryResult<import("./api").ReportStatus> {
+  return useApiQuery(() => api.reports.status(testId), `report-status:${testId}`);
+}
+
 export function useDashboardQuery(): QueryResult<DashboardStats> {
   const q = useApiQuery(() => api.dashboard.stats(), "dashboard");
   return q;

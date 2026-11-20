@@ -60,7 +60,7 @@ export function Topbar() {
   return (
     <header
       ref={ref}
-      className="sticky top-0 z-30 h-[72px] border-b border-[rgb(var(--border))] bg-[rgb(var(--topbar))]/85 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-3"
+      className="print:hidden sticky top-0 z-30 h-[72px] border-b border-[rgb(var(--border))] bg-[rgb(var(--topbar))]/85 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-3"
     >
       {/* Hamburger — sits where sidebar ends */}
       <button

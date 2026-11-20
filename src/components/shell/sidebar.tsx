@@ -370,7 +370,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "sidebar hidden md:flex shrink-0 flex-col bg-[rgb(var(--sidebar))] dark:bg-sidebar-dark border-r border-[rgb(var(--border))] sticky top-0 h-screen z-20",
+        "sidebar hidden md:flex print:!hidden shrink-0 flex-col bg-[rgb(var(--sidebar))] dark:bg-sidebar-dark border-r border-[rgb(var(--border))] sticky top-0 h-screen z-20",
         collapsed ? "w-[80px] sidebar-collapsed" : "w-[260px]"
       )}
     >
