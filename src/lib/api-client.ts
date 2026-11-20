@@ -138,7 +138,7 @@ export interface EngineEvaluation {
 }
 
 /** Ask the backend engine to calculate and judge a test. Empty inputs are dropped. */
-export function evaluateTest(code: string, values: Record<string, number | string>): Promise<EngineEvaluation> {
+export function evaluateTest(code: string, values: Record<string, number | string | number[]>): Promise<EngineEvaluation> {
   const body = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ""));
   return apiFetch<EngineEvaluation>(`/v1/operations/test-templates/${encodeURIComponent(code)}/evaluate`, {
     method: "POST",
