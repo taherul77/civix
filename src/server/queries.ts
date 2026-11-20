@@ -188,6 +188,10 @@ export function useAuditQuery(params: ListAuditParams = {}): QueryResult<AuditRe
 
 // ---------- Dashboard aggregate ----------
 
+export function useTestCommentsQuery(testId: string): QueryResult<import("./contracts").TestComment[]> {
+  return useApiQuery(() => api.tests.comments(testId), `test-comments:${testId}`);
+}
+
 export function useReportStatusQuery(testId: string): QueryResult<import("./api").ReportStatus> {
   return useApiQuery(() => api.reports.status(testId), `report-status:${testId}`);
 }

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, XCircle, MessageSquare, FileSignature, Lock, AlertTriangle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { CommentThread } from "@/components/tests/comment-thread";
+import { ReturnDialog } from "@/components/tests/return-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTestsQuery } from "@/server/queries";
 import { api } from "@/server/api";
@@ -43,10 +45,13 @@ export function ReviewWorkbench() {
     if (ok !== null) reset();
   };
 
-  const onReject = async () => {
-    if (!test) return;
-    const ok = await mutate(() => api.tests.reject(test.id, { comment }), "Returned for correction");
+  // Returning asks for its own reason (separate from approval notes); the API enforces it too.
+  const [returning, setReturning] = useState(false);
+  const doReturn = async (reason: string) => {
+    if (!test) return false;
+    const ok = await mutate(() => api.tests.return(test.id, { comment: reason }), "Returned for correction");
     if (ok !== null) reset();
+    return ok !== null;
   };
 
   const onApprove = () => setDecision("approve");
@@ -54,10 +59,14 @@ export function ReviewWorkbench() {
   const onSign = async () => {
     if (!test) return;
     const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
-    const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }));
+    // Order matters: the API only allows signing a test that is already approved.
+    // Resumable: if an earlier attempt already approved the test, only the signature is missing.
+    if (test.status !== "approved") {
+      const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved");
+      if (apvOk === null) return;
+    }
+    const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }), "Signed & locked");
     if (signOk === null) return;
-    const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved & locked");
-    if (apvOk === null) return;
     setSigned(true);
     setSignedSerial(serial);
   };
@@ -181,7 +190,7 @@ export function ReviewWorkbench() {
               </button>
 
               <button
-                onClick={onReject}
+                onClick={() => setReturning(true)}
                 disabled={!canReview && !canApprove}
                 className="btn btn-outline flex-1 min-w-[200px]"
               >
@@ -214,6 +223,9 @@ export function ReviewWorkbench() {
               </div>
             )}
           </div>
+
+          <CommentThread testId={test.id} />
+          <ReturnDialog open={returning} onClose={() => setReturning(false)} onConfirm={doReturn} />
         </div>
       )}
     </div>

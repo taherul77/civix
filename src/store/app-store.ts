@@ -23,6 +23,8 @@ interface SessionUser {
   roles?: string[];
   tenant: string;
   isSuperAdmin?: boolean;
+  /** Permission strings from the backend JWT (union across the user's roles). The source of truth for useCan(). */
+  permissions?: string[];
 }
 
 interface AppState {

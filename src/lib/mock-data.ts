@@ -47,8 +47,12 @@ export interface Test {
   projectId: string;
   testDate: string;
   technician: LocStr;
-  status: "draft" | "submitted" | "reviewed" | "approved";
+  status: "draft" | "submitted" | "reviewed" | "approved" | "returned";
   passFail: "pass" | "fail" | "pending";
+  /** Values entered on the form (needed to edit a returned test and to print inputs on the report). */
+  inputData?: Record<string, unknown> | null;
+  /** Engine results saved with the test (plus primaryResult for list views). */
+  calculatedResults?: Record<string, unknown> | null;
   primaryResult?: { value: number; unit: string; label: LocStr };
 }
 

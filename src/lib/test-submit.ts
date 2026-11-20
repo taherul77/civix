@@ -1,12 +1,13 @@
 "use client";
 
-import { useData } from "@/store/data-store";
 import { api } from "@/server/api";
 import { getActor } from "@/lib/auth-context";
 import type { Test } from "@/lib/mock-data";
 import type { TestContext } from "@/components/test-form/context-bar";
 
 interface SubmitArgs {
+  /** Catalog code of the test template (e.g. "A4", "B3"). It is stored as the test code so
+   *  the engine and the report can find the template again. */
   code: string;
   name: string;
   category: Test["category"];
@@ -15,38 +16,28 @@ interface SubmitArgs {
   status: Test["status"];
   passFail: Test["passFail"];
   primaryResult?: { value: number; unit: string; label: string };
-}
-
-const yymm = () => {
-  const d = new Date();
-  return `${String(d.getFullYear()).slice(2)}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
-
-export function nextTestCode() {
-  const n = String(Math.floor(Math.random() * 9000) + 1000);
-  return `T-${yymm()}-${n}`;
+  /** The values entered on the form. Needed to edit a returned test and printed on the report. */
+  inputData?: Record<string, unknown>;
+  /** Engine results to store alongside the inputs. */
+  calculatedResults?: Record<string, unknown>;
 }
 
 /**
  * Persist a test record from a generic / bespoke test form.
  *
  * Always creates the record as `draft` so the audit trail captures
- * `create → submit` as two distinct events. If the form's status is
+ * `create -> submit` as two distinct events. If the form's status is
  * `submitted`, immediately calls `api.tests.submit()` for the second event.
  */
 export async function submitTest(args: SubmitArgs): Promise<string> {
-  const projects = useData.getState().projects;
-  const samples  = useData.getState().samples;
-  const projectId = args.ctx.projectId || projects[0]?.id || "";
-  const sampleId = args.ctx.sampleId
-    || samples.find((s) => s.projectId === projectId)?.id
-    || samples[0]?.id
-    || "";
+  const { projectId, sampleId } = args.ctx;
+  if (!projectId || !sampleId) {
+    throw new Error("Choose a project and a sample (of this test's type) before saving.");
+  }
 
-  const newCode = nextTestCode();
   const actor = getActor();
   const created = await api.tests.create({
-    code: newCode,
+    code: args.code,
     name: args.name,
     category: args.category,
     standard: args.standard,
@@ -57,10 +48,44 @@ export async function submitTest(args: SubmitArgs): Promise<string> {
     status: "draft",
     passFail: args.passFail,
     primaryResult: args.primaryResult,
+    inputData: args.inputData,
+    calculatedResults: args.calculatedResults,
   });
 
   if (args.status === "submitted" && actor) {
-    await api.tests.submit(created.id);
+    try {
+      await api.tests.submit(created.id);
+    } catch (e) {
+      // The draft exists: send the user to it instead of letting a retry create a duplicate.
+      throw new PartialSaveError(created.id, e instanceof Error ? e.message : "unknown error");
+    }
   }
-  return newCode;
+  return args.code;
+}
+
+/** The test was saved as a draft but submitting it for review failed. */
+export class PartialSaveError extends Error {
+  constructor(public testId: string, reason: string) {
+    super(`Saved as a draft, but submitting for review failed: ${reason}. Open it to submit again.`);
+  }
+}
+
+/**
+ * Save corrections to a returned (or draft) test and send it back for review.
+ * The API refuses edits once a test is in review or approved.
+ */
+export async function resubmitTest(testId: string, args: {
+  inputData: Record<string, unknown>;
+  calculatedResults?: Record<string, unknown>;
+  passFail: Test["passFail"];
+  testDate?: string;
+  note?: string;
+}): Promise<void> {
+  await api.tests.update(testId, {
+    inputData: args.inputData,
+    calculatedResults: args.calculatedResults,
+    passFail: args.passFail,
+    testDate: args.testDate,
+  });
+  await api.tests.submit(testId, { comment: args.note });
 }

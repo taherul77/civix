@@ -13,7 +13,7 @@ import { useApp } from "@/store/app-store";
 import { fmtAny } from "@/lib/utils";
 import type { TestRecord } from "@/server/contracts";
 
-const STATUS = ["all", "draft", "submitted", "reviewed", "approved"] as const;
+const STATUS = ["all", "draft", "submitted", "reviewed", "returned", "approved"] as const;
 const CATS = ["all", "concrete", "soil", "aggregate", "asphalt", "steel", "cement", "masonry", "water"] as const;
 
 export function TestsExplorer() {

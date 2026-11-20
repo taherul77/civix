@@ -1,7 +1,8 @@
 "use client";
 
-import { hasPermission, type Permission } from "@/lib/rbac";
-import { getActor } from "@/lib/auth-context";
+import { type Permission } from "@/lib/rbac";
+import { getActor, userCan } from "@/lib/auth-context";
+import { useApp } from "@/store/app-store";
 import { errors } from "@/server/errors";
 
 /**
@@ -17,7 +18,8 @@ import { errors } from "@/server/errors";
 export function require(perm: Permission) {
   const actor = getActor();
   if (!actor) throw errors.unauthenticated();
-  if (!hasPermission(actor.role, perm)) throw errors.forbidden(perm);
+  const allowed = userCan(useApp.getState().user, perm);
+  if (!allowed) throw errors.forbidden(perm);
   return actor;
 }
 

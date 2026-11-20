@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileCheck, Download, Send, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileCheck, FileText, Send, RotateCcw, Pencil, AlertTriangle, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
+import { ReturnDialog } from "@/components/tests/return-dialog";
+import { CommentThread } from "@/components/tests/comment-thread";
+import { catalog } from "@/lib/test-catalog";
+import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery, useTestCommentsQuery } from "@/server/queries";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
 import { useLoc } from "@/lib/i18n-data";
@@ -24,6 +28,10 @@ export function TestDetailView({ id }: { id: string }) {
   const { data: audit = [] } = useAuditQuery();
 
   const canSubmit = useCan("test:submit");
+  const canReview = useCan("test:review");
+  const { data: thread = [] } = useTestCommentsQuery(id);
+  const [returning, setReturning] = useState(false);
+  const canSign = useCan("test:sign");
 
   // 404 only after the lookup finished; at first render `test` is still undefined.
   if (!test) {
@@ -36,6 +44,18 @@ export function TestDetailView({ id }: { id: string }) {
   const reviewEvt   = lastByAction("review");
   const approveEvt  = lastByAction("approve");
   const signEvt     = lastByAction("sign");
+  // A returned/draft test is outside the review cycle: earlier review/approval events no longer count.
+  const cycleOpen = test.status === "returned" || test.status === "draft";
+  const lastReturn = [...thread].reverse().find((c) => c.kind === "return");
+  // Every catalog form supports ?edit=<id> (prefilled from the saved inputs).
+  const editHref = catalog.some((c) => c.code === test.code) ? `/tests/new/${test.code}?edit=${test.id}` : null;
+
+  // Approved but not signed yet (e.g. signing failed after approving): sign from here.
+  const needsSignature = test.status === "approved" && !signEvt;
+  const signNow = () => {
+    const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
+    return mutate(() => api.tests.sign(test.id, { certificateSerial: serial }), "Signed & locked");
+  };
 
   return (
     <div className="space-y-6">
@@ -62,10 +82,32 @@ export function TestDetailView({ id }: { id: string }) {
             )}
             {(test.status === "submitted" || test.status === "reviewed") && (
               <button
-                onClick={() => mutate(() => api.tests.reject(test.id), "Returned to draft")}
+                onClick={() => setReturning(true)}
+                disabled={!canReview}
                 className="btn btn-outline"
+                title={canReview ? "" : tt("Requires a reviewer role")}
               >
-                <RotateCcw className="w-4 h-4" /> {tt("Return to draft")}
+                <RotateCcw className="w-4 h-4" /> {tt("Return for correction")}
+              </button>
+            )}
+            {test.status === "returned" && editHref && (
+              <Link href={editHref} className="btn btn-outline">
+                <Pencil className="w-4 h-4" /> {tt("Edit and resubmit")}
+              </Link>
+            )}
+            {test.status === "returned" && (
+              <button
+                onClick={() => mutate(() => api.tests.submit(test.id), "Resubmitted for review")}
+                disabled={!canSubmit}
+                className="btn btn-outline"
+                title={tt("Send back for review without changing the data")}
+              >
+                <Send className="w-4 h-4" /> {tt("Resubmit unchanged")}
+              </button>
+            )}
+            {needsSignature && (
+              <button onClick={signNow} disabled={!canSign} className="btn btn-outline" title={canSign ? "" : tt("Only Approvers can sign.")}>
+                <ShieldCheck className="w-4 h-4" /> {tt("Sign")}
               </button>
             )}
             <Link href={`/tests/${test.id}/report`} className="btn btn-primary">
@@ -74,6 +116,25 @@ export function TestDetailView({ id }: { id: string }) {
           </div>
         }
       />
+
+      {test.status === "returned" && (
+        <div className="rounded-lg border-2 border-amber-400/70 bg-amber-50 dark:bg-amber-950/20 p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="font-semibold text-amber-800 dark:text-amber-200">{tt("Returned for correction")}</div>
+            {lastReturn && (
+              <div className="text-sm mt-1 whitespace-pre-wrap break-words">
+                <span className="text-[rgb(var(--muted))]">{lastReturn.authorName || lastReturn.authorEmail}: </span>{lastReturn.body}
+              </div>
+            )}
+            <div className="text-xs text-[rgb(var(--muted))] mt-1.5">
+              {editHref
+                ? tt("Fix the data with Edit and resubmit, or resubmit unchanged if no change is needed.")
+                : tt("This form cannot be reopened for editing yet. Resubmit unchanged, or enter a corrected test.")}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2 space-y-4">
@@ -125,34 +186,42 @@ export function TestDetailView({ id }: { id: string }) {
             at={fmtAny(test.testDate, lang)}
           />
           <Step
-            done={!!submitEvt || ["submitted","reviewed","approved"].includes(test.status)}
+            done={(!cycleOpen && !!submitEvt) || ["submitted","reviewed","approved"].includes(test.status)}
             label={tt("Submitted for review")}
             by={submitEvt?.user ?? loc(test.technician)}
             at={submitEvt?.ts ?? "—"}
           />
           <Step
-            done={!!reviewEvt || ["reviewed","approved"].includes(test.status)}
+            done={(!cycleOpen && !!reviewEvt) || ["reviewed","approved"].includes(test.status)}
             label={tt("Reviewed")}
             by={reviewEvt?.user ?? tt("Quality Manager")}
             at={reviewEvt?.ts ?? "—"}
           />
           <Step
-            done={!!approveEvt || test.status === "approved"}
+            done={(!cycleOpen && !!approveEvt) || test.status === "approved"}
             label={tt("Approved")}
             by={approveEvt?.user ?? tt("Approver")}
             at={approveEvt?.ts ?? "—"}
           />
           <Step
-            done={!!signEvt}
+            done={!cycleOpen && !!signEvt}
             label={tt("Digitally signed")}
             by={signEvt?.user ?? "—"}
             at={signEvt?.ts ?? "—"}
           />
           <div className="pt-3 border-t border-[rgb(var(--border))]">
-            <button className="btn btn-outline w-full"><Download className="w-4 h-4" /> {tt("Download PDF")}</button>
+            <Link href={`/tests/${test.id}/report`} className="btn btn-outline w-full"><FileText className="w-4 h-4" /> {tt("Open report / PDF")}</Link>
           </div>
         </div>
       </div>
+
+      <CommentThread testId={test.id} />
+
+      <ReturnDialog
+        open={returning}
+        onClose={() => setReturning(false)}
+        onConfirm={async (reason) => (await mutate(() => api.tests.return(test.id, { comment: reason }), "Returned for correction")) !== null}
+      />
     </div>
   );
 }

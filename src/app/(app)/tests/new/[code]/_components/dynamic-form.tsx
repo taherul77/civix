@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, notFound } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Save, Send } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSection, Field, Result } from "@/components/test-form/section";
@@ -11,7 +10,9 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { schemas } from "@/lib/test-schemas";
 import { categoryMeta } from "@/lib/test-catalog";
-import { submitTest } from "@/lib/test-submit";
+import { submitTest, resubmitTest, PartialSaveError } from "@/lib/test-submit";
+import { useEditTest, ReturnReason, EditProblem } from "@/components/test-form/edit-support";
+import { toast } from "@/components/ui/toast";
 import { evaluateTest, isBackendActive, type EngineEvaluation } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,16 @@ export function DynamicTestForm({ code }: { code: string }) {
 
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard: state updates after the next render, so a double-click would get through.
+  const inFlight = useRef(false);
+
+  // Edit mode: /tests/new/<code>?edit=<test id> reopens a draft or returned test.
+  const edit = useEditTest(schema.code);
+  const editId = edit.id;
+  const editTest = edit.test;
+  const editProblem = edit.problem;
+  const prefilled = edit.prefilled;
 
   const initial: Record<string, number | string> = {};
   for (const sec of schema.sections) {
@@ -32,6 +43,21 @@ export function DynamicTestForm({ code }: { code: string }) {
     }
   }
   const [values, setValues] = useState<Record<string, number | string>>(initial);
+
+  useEffect(() => {
+    if (!editTest || prefilled || editProblem) return;
+    const known = new Set(schema.sections.flatMap((sec) => sec.fields.map((f) => f.key)));
+    const saved = editTest.inputData ?? {};
+    setValues((v) => {
+      const next = { ...v };
+      for (const [k, val] of Object.entries(saved)) {
+        if (known.has(k) && (typeof val === "number" || typeof val === "string")) next[k] = val;
+      }
+      return next;
+    });
+    edit.markPrefilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editTest, prefilled, editProblem, schema]);
 
   const computedResults = useMemo(() => schema.results.map((r) => {
     const raw = r.compute(values);
@@ -70,21 +96,48 @@ export function DynamicTestForm({ code }: { code: string }) {
     ? { value: +primary.raw.toFixed(primary.decimals ?? 2), unit: primary.unit ?? "", label: primary.label }
     : undefined;
 
-  const handleSubmit = (status: "draft" | "submitted") => {
+  const handleSubmit = async (status: "draft" | "submitted") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     const passFail = status === "draft"
       ? "pending"
       : passes.length === 0 ? "pending" : overall;
-    submitTest({
-      code: schema.code,
-      name: schema.name,
-      category: schema.category,
-      standard: schema.standard,
-      ctx,
-      status,
-      passFail,
-      primaryResult,
-    });
-    router.push("/tests");
+    // What gets stored with the test: the entered values and the engine's results.
+    const calculatedResults: Record<string, unknown> = server
+      ? server.results
+      : Object.fromEntries(computedResults.map((r) => [r.label, r.raw]));
+    setSaving(true);
+    try {
+      if (editId) {
+        await resubmitTest(editId, {
+          inputData: values,
+          calculatedResults: { ...calculatedResults, ...(primaryResult ? { primaryResult } : {}) },
+          passFail: passes.length === 0 ? "pending" : overall,
+        });
+        toast.success("Corrections saved and test resubmitted");
+        router.push(`/tests/${editId}`);
+      } else {
+        await submitTest({
+          code: schema.code,
+          name: schema.name,
+          category: schema.category,
+          standard: schema.standard,
+          ctx,
+          status,
+          passFail,
+          primaryResult,
+          inputData: values,
+          calculatedResults,
+        });
+        router.push("/tests");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the test");
+      if (e instanceof PartialSaveError) router.push(`/tests/${e.testId}`);
+    } finally {
+      setSaving(false);
+      inFlight.current = false;
+    }
   };
 
   return (
@@ -106,11 +159,17 @@ export function DynamicTestForm({ code }: { code: string }) {
                 <ShieldCheck className="w-3 h-3" /> Saudi-specific
               </span>
             )}
-            <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
-              <Save className="w-4 h-4" /> Save draft
-            </button>
-            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")}>
-              <Send className="w-4 h-4" /> Submit
+            {!editId && (
+              <button className="btn btn-outline" onClick={() => handleSubmit("draft")} disabled={saving}>
+                <Save className="w-4 h-4" /> Save draft
+              </button>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => handleSubmit("submitted")}
+              disabled={saving || (!!editId && (!prefilled || !!editProblem))}
+            >
+              <Send className="w-4 h-4" /> {editId ? "Save corrections & resubmit" : "Submit"}
             </button>
           </div>
         }
@@ -118,7 +177,10 @@ export function DynamicTestForm({ code }: { code: string }) {
 
       <p className="text-sm text-[rgb(var(--muted))] -mt-4">{schema.description}</p>
 
-      <TestContextBar value={ctx} onChange={setCtx} defaultCategory={schema.category} />
+      {editId && !editProblem && <ReturnReason testId={editId} />}
+      {editProblem && <EditProblem problem={editProblem} testId={editTest?.id} />}
+
+      {!editId && <TestContextBar value={ctx} onChange={setCtx} defaultCategory={schema.category} />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

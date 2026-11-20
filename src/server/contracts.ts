@@ -91,6 +91,16 @@ export type UpdateProjectInput   = Partial<CreateProjectInput>;
 export type CreateSampleInput    = Omit<SampleRecord, "id">;
 export type UpdateSampleInput    = Partial<CreateSampleInput>;
 export type CreateTestInput      = Omit<TestRecord, "id">;
+
+/** One entry of a test comment thread. `kind` is "comment" or the workflow action that produced it. */
+export interface TestComment {
+  id: string;
+  kind: "comment" | "submit" | "review" | "approve" | "return" | "sign";
+  body: string;
+  authorEmail: string;
+  authorName?: string | null;
+  createdAt: string;
+}
 export type CreateEquipmentInput = Omit<EquipmentRecord, "id">;
 export type InviteUserInput      = Omit<UserRecord, "id">;
 export type CreateInvoiceInput   = InvoiceRecord;
