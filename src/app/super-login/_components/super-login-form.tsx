@@ -19,8 +19,9 @@ export function SuperLoginForm() {
   // Wait for zustand-persist to rehydrate before deciding whether the user
   // is already signed in. Without this, a reload of /super-login briefly
   // shows the form before the persisted session loads.
-  const [hydrated, setHydrated] = useState(() => useApp.persist.hasHydrated());
+  const [hydrated, setHydrated] = useState(() => useApp.persist?.hasHydrated() ?? true);
   useEffect(() => {
+    if (!useApp.persist) { setHydrated(true); return; }
     setHydrated(useApp.persist.hasHydrated());
     const unsub = useApp.persist.onFinishHydration(() => setHydrated(true));
     return () => { unsub(); };
