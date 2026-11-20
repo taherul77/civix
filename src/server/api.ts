@@ -481,7 +481,7 @@ export const samples = {
     await tick();
     requireBackend();
     const out = await apiFetch<{ items: ApiSample[]; total: number }>("/v1/operations/samples", {
-      query: { type: params.type, projectId: params.projectId, q: params.q },
+      query: { type: params.type, projectId: params.projectId, q: params.q, limit: params.limit },
     });
     return { items: out.items.map(sampleFromApi), total: out.total };
   },
