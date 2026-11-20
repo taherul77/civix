@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { MapPin } from "lucide-react";
-import { sitesGeo } from "@/lib/mock-extra";
+import type { sitesGeo as SeedSites } from "@/lib/mock-extra";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
@@ -29,9 +30,14 @@ const typeColor: Record<string, string> = {
   Water: "#0891b2",
 };
 
+// Samples do not carry GPS coordinates yet, so there is nothing real to plot.
+// (Seed pins were removed; wire this to sample.gps once field capture stores it.)
+type Site = (typeof SeedSites)[number];
+const sitesGeo: Site[] = [];
+
 export function SampleMap() {
   const tt = useT();
-  const [hovered, setHovered] = useState<typeof sitesGeo[number] | null>(null);
+  const [hovered, setHovered] = useState<Site | null>(null);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -84,6 +90,7 @@ export function SampleMap() {
 
       <div className="card p-4 space-y-2">
         <h3 className="font-semibold mb-2">{tt("Locations")} ({sitesGeo.length})</h3>
+        {sitesGeo.length === 0 && <EmptyState height={160} title={tt("No GPS-tagged samples yet")} hint={tt("Samples captured in the field with a location will appear on the map.")} />}
         {sitesGeo.map((s) => {
           const c = typeColor[s.type] ?? "#64748b";
           return (

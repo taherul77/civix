@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, FlaskConical, Wrench, Beaker } from "lucide-react";
-import { events } from "@/lib/mock-extra";
+import { useEquipmentQuery, useSamplesQuery, useTestsQuery } from "@/server/queries";
+import { useLoc } from "@/lib/i18n-data";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
@@ -19,9 +20,28 @@ function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+interface CalEvent { id: string; date: string; type: "test" | "calibration" | "sampling"; title: string; href?: string }
+
 export function CalendarGrid() {
   const tt = useT();
-  const [cursor, setCursor] = useState(new Date(2026, 3, 1));
+  const loc = useLoc();
+  const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+  const { data: tests = [] } = useTestsQuery({});
+  const { data: samples = [] } = useSamplesQuery({});
+  const { data: equipment = [] } = useEquipmentQuery();
+
+  // Real events only: test dates, sample dates and calibration due dates.
+  const events = useMemo<CalEvent[]>(() => [
+    ...tests.filter((t) => t.testDate).map((t): CalEvent => ({
+      id: `t-${t.id}`, date: t.testDate.slice(0, 10), type: "test", title: `${t.code} — ${loc(t.name)}`, href: `/tests/${t.id}`,
+    })),
+    ...samples.filter((x) => x.date).map((x): CalEvent => ({
+      id: `s-${x.id}`, date: x.date.slice(0, 10), type: "sampling", title: `${x.code} @ ${loc(x.location)}`, href: "/samples",
+    })),
+    ...equipment.filter((e) => e.calibrationDue).map((e): CalEvent => ({
+      id: `c-${e.id}`, date: e.calibrationDue.slice(0, 10), type: "calibration", title: `${e.code} calibration due`, href: "/equipment",
+    })),
+  ], [tests, samples, equipment, loc]);
   const monthLabel = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   const start = startOfMonth(cursor);
@@ -34,7 +54,7 @@ export function CalendarGrid() {
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(cursor.getFullYear(), cursor.getMonth(), d));
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const today = new Date(2026, 3, 28);
+  const today = new Date();
 
   return (
     <div className="card p-5">

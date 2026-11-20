@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { AlertTriangle, AlertCircle, CheckCircle2, Info } from "lucide-react";
-import { notifications } from "@/lib/mock-extra";
+import { BellOff } from "lucide-react";
+import { useLiveNotifications } from "@/hooks/use-live-notifications";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 const cfg = {
@@ -13,6 +15,10 @@ const cfg = {
 };
 
 export function NotificationsList() {
+  const notifications = useLiveNotifications();
+  if (notifications.length === 0) {
+    return <EmptyState icon={BellOff} title="You're all caught up" hint="Alerts for overdue calibrations, failed tests and pending reviews appear here." height={220} />;
+  }
   return (
     <div className="space-y-3">
       {notifications.map((n) => {

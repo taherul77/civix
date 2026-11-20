@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { Shield } from "lucide-react";
-import { audit as seedAudit } from "@/lib/mock-extra";
 import { useAuditQuery } from "@/server/queries";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -45,7 +44,6 @@ export function AuditLogExplorer() {
         diff: a.diff,
         ip: a.ip,
       })),
-      ...seedAudit,
     ],
     [liveAudit]
   );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, XCircle, MessageSquare, FileSignature, Lock, AlertTriangle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useTestsQuery } from "@/server/queries";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
@@ -65,9 +66,12 @@ export function ReviewWorkbench() {
     <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
       <div className="card p-3 space-y-1.5 max-h-[600px] overflow-y-auto">
         {queue.length === 0 && (
-          <div className="text-sm text-[rgb(var(--muted))] p-4 text-center">
-            {tt("Review queue empty.")}
-          </div>
+          <EmptyState
+            icon={CheckCircle2}
+            height={200}
+            title={tt("Review queue is empty")}
+            hint={tt("Submitted tests waiting for review or approval appear here.")}
+          />
         )}
         {queue.map((t) => (
           <button
