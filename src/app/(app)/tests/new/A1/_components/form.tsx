@@ -63,7 +63,7 @@ export function A1Form() {
   const designOk = main.fcCorr >= 0.85 * designStrength;
   const avgOk = avgFc >= designStrength;
   const localOverall = designOk && avgOk ? "pass" : "fail";
-  const { server, error: serverError } = useServerVerdict("A1", {
+  const payload = {
     specimenType: ({ cube_150: "cube_150mm", cyl_150x300: "cylinder_150x300mm", cyl_100x200: "cylinder_100x200mm" } as const)[specType],
     specimenId: specimens[0]?.id ?? "C-1",
     castingDate: castDate,
@@ -77,7 +77,8 @@ export function A1Form() {
     humidityPercent: humidity,
     designStrengthMpa: designStrength,
     specimenLoadsKn: specimens.map((sp) => sp.load),
-  });
+  };
+  const { server, error: serverError } = useServerVerdict("A1", payload);
   const overall = verdictOf(server, localOverall);
 
   const tempWarn = temp < 18 || temp > 28 ? "Outside 20 ± 2 °C standard curing band" : undefined;
@@ -134,9 +135,10 @@ export function A1Form() {
     toast.success(`Pulled reading from ${reading.vendor} (peak ${peakKn?.toFixed(1)} kN)`);
   };
 
-  const handleSubmit = (status: "draft" | "submitted") => {
+  const handleSubmit = async (status: "draft" | "submitted") => {
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
-    submitTest({
+    try {
+    await submitTest({
       code: "A1",
       name: "Compressive Strength of Concrete",
       category: "concrete",
@@ -145,8 +147,13 @@ export function A1Form() {
       status,
       passFail,
       primaryResult: { value: +main.fcCorr.toFixed(2), unit: "MPa", label: `f'c @ ${age}d` },
+      inputData: payload,
+      calculatedResults: server?.results,
     });
     router.push("/tests");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the test");
+    }
   };
 
   return (

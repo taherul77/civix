@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, XCircle, MessageSquare, FileSignature, Lock, AlertTriangle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { CommentThread } from "@/components/tests/comment-thread";
+import { toast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTestsQuery } from "@/server/queries";
 import { api } from "@/server/api";
@@ -43,9 +45,12 @@ export function ReviewWorkbench() {
     if (ok !== null) reset();
   };
 
+  // The reviewer must say what to correct; the API enforces the same rule.
+  const reasonOk = comment.trim().length >= 3;
   const onReject = async () => {
     if (!test) return;
-    const ok = await mutate(() => api.tests.reject(test.id, { comment }), "Returned for correction");
+    if (!reasonOk) { toast.warn("Write what needs to be corrected before returning the test."); return; }
+    const ok = await mutate(() => api.tests.return(test.id, { comment: comment.trim() }), "Returned for correction");
     if (ok !== null) reset();
   };
 
@@ -54,10 +59,11 @@ export function ReviewWorkbench() {
   const onSign = async () => {
     if (!test) return;
     const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
-    const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }));
-    if (signOk === null) return;
-    const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved & locked");
+    // Order matters: the API only allows signing a test that is already approved.
+    const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved");
     if (apvOk === null) return;
+    const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }), "Signed & locked");
+    if (signOk === null) return;
     setSigned(true);
     setSignedSerial(serial);
   };
@@ -156,6 +162,7 @@ export function ReviewWorkbench() {
               placeholder={tt("Add your review notes (visible in audit log)...")}
               disabled={!actor || (!canReview && !canApprove)}
             />
+            <p className="text-xs text-[rgb(var(--muted))] -mt-2">{tt("Required when returning a test for correction.")}</p>
 
             <div className="flex flex-wrap gap-2">
               {test.status === "submitted" && (
@@ -182,8 +189,9 @@ export function ReviewWorkbench() {
 
               <button
                 onClick={onReject}
-                disabled={!canReview && !canApprove}
+                disabled={(!canReview && !canApprove) || !reasonOk}
                 className="btn btn-outline flex-1 min-w-[200px]"
+                title={reasonOk ? "" : tt("Write what needs to be corrected first")}
               >
                 <XCircle className="w-4 h-4" /> {tt("Return for correction")}
               </button>
@@ -214,6 +222,8 @@ export function ReviewWorkbench() {
               </div>
             )}
           </div>
+
+          <CommentThread testId={test.id} />
         </div>
       )}
     </div>

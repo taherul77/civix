@@ -2,6 +2,7 @@
 
 import { hasPermission, type Permission } from "@/lib/rbac";
 import { getActor } from "@/lib/auth-context";
+import { useApp } from "@/store/app-store";
 import { errors } from "@/server/errors";
 
 /**
@@ -17,7 +18,11 @@ import { errors } from "@/server/errors";
 export function require(perm: Permission) {
   const actor = getActor();
   if (!actor) throw errors.unauthenticated();
-  if (!hasPermission(actor.role, perm)) throw errors.forbidden(perm);
+  // Same rule as useCan(): the backend's permission list wins (tenant-defined roles are not in the
+  // built-in role table); older sessions without it fall back to the role-name table.
+  const u = useApp.getState().user;
+  const allowed = u?.isSuperAdmin || (u?.permissions ? u.permissions.includes(perm) : hasPermission(actor.role, perm));
+  if (!allowed) throw errors.forbidden(perm);
   return actor;
 }
 

@@ -137,6 +137,7 @@ export interface ApiTest {
   testDate?: string | null;
   status: string;
   passFailStatus?: string | null;
+  inputData?: Record<string, unknown> | null;
   calculatedResults?: { primaryResult?: { value: number; unit: string; label?: string } } | Record<string, unknown> | null;
 }
 
@@ -146,6 +147,7 @@ export function testFromApi(t: ApiTest): Test {
   const status: Test["status"] =
     t.status === "submitted" ? "submitted" :
     t.status === "reviewed"  ? "reviewed"  :
+    t.status === "returned" || t.status === "rejected" ? "returned" :
     t.status === "approved"  ? "approved"  :
     t.status === "signed"    ? "approved"  : // UI doesn't model "signed" yet
     "draft";
@@ -165,6 +167,8 @@ export function testFromApi(t: ApiTest): Test {
     testDate: isoDate(t.testDate),
     technician: "",
     status,
+    inputData: (t.inputData as Record<string, unknown> | null | undefined) ?? null,
+    calculatedResults: (t.calculatedResults as Record<string, unknown> | null | undefined) ?? null,
     passFail:
       t.passFailStatus === "pass" ? "pass" :
       t.passFailStatus === "fail" ? "fail" : "pending",

@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileCheck, Download, Send, RotateCcw } from "lucide-react";
+import { ArrowLeft, FileCheck, FileText, Send, RotateCcw, Pencil, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
+import { Modal } from "@/components/ui/modal";
+import { CommentThread } from "@/components/tests/comment-thread";
+import { catalog } from "@/lib/test-catalog";
+import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery, useTestCommentsQuery } from "@/server/queries";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
 import { useLoc } from "@/lib/i18n-data";
@@ -24,6 +28,11 @@ export function TestDetailView({ id }: { id: string }) {
   const { data: audit = [] } = useAuditQuery();
 
   const canSubmit = useCan("test:submit");
+  const canReview = useCan("test:review");
+  const { data: thread = [] } = useTestCommentsQuery(id);
+  const [returning, setReturning] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
 
   // 404 only after the lookup finished; at first render `test` is still undefined.
   if (!test) {
@@ -36,6 +45,24 @@ export function TestDetailView({ id }: { id: string }) {
   const reviewEvt   = lastByAction("review");
   const approveEvt  = lastByAction("approve");
   const signEvt     = lastByAction("sign");
+  // A returned/draft test is outside the review cycle: earlier review/approval events no longer count.
+  const cycleOpen = test.status === "returned" || test.status === "draft";
+  const lastReturn = [...thread].reverse().find((c) => c.kind === "return");
+  // Bespoke forms (A1/A4/H1) cannot be reopened for editing yet; every catalog form that uses the generic form can.
+  const BESPOKE_FORMS = ["A1", "A4", "H1"];
+  const editHref = !BESPOKE_FORMS.includes(test.code) && catalog.some((c) => c.code === test.code)
+    ? `/tests/new/${test.code}?edit=${test.id}`
+    : null;
+
+  const doReturn = async () => {
+    setBusy(true);
+    try {
+      const ok = await mutate(() => api.tests.return(test.id, { comment: reason.trim() }), "Returned for correction");
+      if (ok !== null) { setReturning(false); setReason(""); } // null = failed (toast already shown)
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -62,10 +89,27 @@ export function TestDetailView({ id }: { id: string }) {
             )}
             {(test.status === "submitted" || test.status === "reviewed") && (
               <button
-                onClick={() => mutate(() => api.tests.reject(test.id), "Returned to draft")}
+                onClick={() => setReturning(true)}
+                disabled={!canReview}
                 className="btn btn-outline"
+                title={canReview ? "" : tt("Requires a reviewer role")}
               >
-                <RotateCcw className="w-4 h-4" /> {tt("Return to draft")}
+                <RotateCcw className="w-4 h-4" /> {tt("Return for correction")}
+              </button>
+            )}
+            {test.status === "returned" && editHref && (
+              <Link href={editHref} className="btn btn-outline">
+                <Pencil className="w-4 h-4" /> {tt("Edit and resubmit")}
+              </Link>
+            )}
+            {test.status === "returned" && (
+              <button
+                onClick={() => mutate(() => api.tests.submit(test.id), "Resubmitted for review")}
+                disabled={!canSubmit}
+                className="btn btn-outline"
+                title={tt("Send back for review without changing the data")}
+              >
+                <Send className="w-4 h-4" /> {tt("Resubmit unchanged")}
               </button>
             )}
             <Link href={`/tests/${test.id}/report`} className="btn btn-primary">
@@ -74,6 +118,25 @@ export function TestDetailView({ id }: { id: string }) {
           </div>
         }
       />
+
+      {test.status === "returned" && (
+        <div className="rounded-lg border-2 border-amber-400/70 bg-amber-50 dark:bg-amber-950/20 p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="font-semibold text-amber-800 dark:text-amber-200">{tt("Returned for correction")}</div>
+            {lastReturn && (
+              <div className="text-sm mt-1 whitespace-pre-wrap break-words">
+                <span className="text-[rgb(var(--muted))]">{lastReturn.authorName || lastReturn.authorEmail}: </span>{lastReturn.body}
+              </div>
+            )}
+            <div className="text-xs text-[rgb(var(--muted))] mt-1.5">
+              {editHref
+                ? tt("Fix the data with Edit and resubmit, or resubmit unchanged if no change is needed.")
+                : tt("This form cannot be reopened for editing yet. Resubmit unchanged, or enter a corrected test.")}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2 space-y-4">
@@ -125,34 +188,64 @@ export function TestDetailView({ id }: { id: string }) {
             at={fmtAny(test.testDate, lang)}
           />
           <Step
-            done={!!submitEvt || ["submitted","reviewed","approved"].includes(test.status)}
+            done={(!cycleOpen && !!submitEvt) || ["submitted","reviewed","approved"].includes(test.status)}
             label={tt("Submitted for review")}
             by={submitEvt?.user ?? loc(test.technician)}
             at={submitEvt?.ts ?? "—"}
           />
           <Step
-            done={!!reviewEvt || ["reviewed","approved"].includes(test.status)}
+            done={(!cycleOpen && !!reviewEvt) || ["reviewed","approved"].includes(test.status)}
             label={tt("Reviewed")}
             by={reviewEvt?.user ?? tt("Quality Manager")}
             at={reviewEvt?.ts ?? "—"}
           />
           <Step
-            done={!!approveEvt || test.status === "approved"}
+            done={(!cycleOpen && !!approveEvt) || test.status === "approved"}
             label={tt("Approved")}
             by={approveEvt?.user ?? tt("Approver")}
             at={approveEvt?.ts ?? "—"}
           />
           <Step
-            done={!!signEvt}
+            done={!cycleOpen && !!signEvt}
             label={tt("Digitally signed")}
             by={signEvt?.user ?? "—"}
             at={signEvt?.ts ?? "—"}
           />
           <div className="pt-3 border-t border-[rgb(var(--border))]">
-            <button className="btn btn-outline w-full"><Download className="w-4 h-4" /> {tt("Download PDF")}</button>
+            <Link href={`/tests/${test.id}/report`} className="btn btn-outline w-full"><FileText className="w-4 h-4" /> {tt("Open report / PDF")}</Link>
           </div>
         </div>
       </div>
+
+      <CommentThread testId={test.id} />
+
+      <Modal
+        open={returning}
+        onClose={() => setReturning(false)}
+        title={tt("Return for correction")}
+        size="md"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setReturning(false)}>{tt("Cancel")}</button>
+            <button className="btn btn-primary" onClick={doReturn} disabled={busy || reason.trim().length < 3}>
+              <RotateCcw className="w-4 h-4" /> {tt("Return to technician")}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-[rgb(var(--muted))] mb-2">{tt("Say what needs to be corrected. The technician sees this on the test.")}</p>
+        <textarea
+          className="input min-h-[110px]"
+          autoFocus
+          value={reason}
+          maxLength={2000}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={tt("e.g. The load reading looks wrong, please re-check the gauge and re-enter it.")}
+        />
+        {reason.trim().length > 0 && reason.trim().length < 3 && (
+          <p className="text-xs text-rose-600 mt-1">{tt("Please write a few words.")}</p>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { FormSection, Field } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { toast } from "@/components/ui/toast";
 import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
 import { cn } from "@/lib/utils";
 
@@ -71,14 +72,15 @@ export function H1Form() {
   const failures = evaluations.filter((e) => e.s === "fail").length;
   const warnings = evaluations.filter((e) => e.s === "warn").length;
   const localOverall = failures === 0 ? "pass" : "fail";
-  const { server, error: serverError } = useServerVerdict("H1", {
+  const payload = {
     samplingPoint, sampleType,
     ph: values.ph!, turbidityNtu: values.turbidity!, colorTcu: values.color!, tdsMgL: values.tds!,
     chlorideMgL: values.chloride!, sulfateMgL: values.sulfate!, nitrateMgL: values.nitrate!,
     fluorideMgL: values.fluoride!, ironMgL: values.iron!, manganeseMgL: values.manganese!,
     leadMgL: values.lead!, arsenicMgL: values.arsenic!, cadmiumMgL: values.cadmium!,
     residualChlorineMgL: values.residualCl!, totalColiformMpn: values.coliform!, eColiMpn: values.ecoli!,
-  });
+  };
+  const { server, error: serverError } = useServerVerdict("H1", payload);
   const overall = verdictOf(server, localOverall);
 
   const groups = (Object.keys(groupLabels) as (keyof typeof groupLabels)[]).map((g) => ({
@@ -89,9 +91,10 @@ export function H1Form() {
 
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
-  const handleSubmit = (status: "draft" | "submitted") => {
+  const handleSubmit = async (status: "draft" | "submitted") => {
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
-    submitTest({
+    try {
+    await submitTest({
       code: "H1",
       name: "Potable Water Analysis",
       category: "water",
@@ -100,8 +103,13 @@ export function H1Form() {
       status,
       passFail,
       primaryResult: { value: +values.tds.toFixed(0), unit: "mg/L", label: "TDS" },
+      inputData: payload,
+      calculatedResults: server?.results,
     });
     router.push("/tests");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the test");
+    }
   };
 
   return (

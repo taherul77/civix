@@ -82,6 +82,7 @@ import type {
   AuditRecord,
   VerifyResult,
   WorkflowComment,
+  TestComment,
 } from "@/server/contracts";
 
 // ---------------------------------------------------------------------------
@@ -246,6 +247,7 @@ export const auth = {
       roles: session.roles,
       tenant: session.tenant,
       isSuperAdmin: !!out.session.isSuperAdmin,
+      permissions: out.session.permissions,
     });
 
     // Hydrate the per-tenant page-permission matrix so the sidebar can
@@ -595,8 +597,13 @@ export const tests = {
         standardBody:   stdBody || undefined,
         standardNumber: stdNum.length ? stdNum.join(" ") : undefined,
         testDate:       input.testDate ? new Date(input.testDate).toISOString() : undefined,
-        inputData:      {},
-        calculatedResults: input.primaryResult ? { primaryResult: { value: input.primaryResult.value, unit: input.primaryResult.unit, label: locStr(input.primaryResult.label) } } : undefined,
+        inputData:      input.inputData ?? {},
+        calculatedResults: (input.primaryResult || input.calculatedResults)
+          ? {
+              ...(input.calculatedResults ?? {}),
+              ...(input.primaryResult ? { primaryResult: { value: input.primaryResult.value, unit: input.primaryResult.unit, label: locStr(input.primaryResult.label) } } : {}),
+            }
+          : undefined,
         passFailStatus: input.passFail === "pass" ? "pass" : input.passFail === "fail" ? "fail" : undefined,
       },
     });
@@ -604,25 +611,25 @@ export const tests = {
     return testFromApi(row);
   },
 
-  async submit(id: string): Promise<void> {
+  async submit(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/operations/tests/${id}/submit`, { method: "POST", body: {} });
-    invalidate("tests", "audit", "dashboard");
+    await apiFetch(`/v1/operations/tests/${id}/submit`, { method: "POST", body: { comment: opts.comment } });
+    invalidate("tests", "audit", "dashboard", "test-comments");
   },
 
   async review(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/operations/tests/${id}/review`, { method: "POST", body: { comment: opts.comment } });
-    invalidate("tests", "audit", "dashboard");
+    invalidate("tests", "audit", "dashboard", "test-comments");
   },
 
   async approve(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
     await apiFetch(`/v1/operations/tests/${id}/approve`, { method: "POST", body: { comment: opts.comment } });
-    invalidate("tests", "audit", "dashboard");
+    invalidate("tests", "audit", "dashboard", "test-comments");
   },
 
   async sign(id: string, input: SignInput): Promise<void> {
@@ -633,11 +640,50 @@ export const tests = {
     invalidate("tests", "audit", "dashboard");
   },
 
-  async reject(id: string, opts: WorkflowComment = {}): Promise<void> {
+  /** Return for correction. The reviewer must say what to fix (the API answers 400 otherwise). */
+  async return(id: string, opts: WorkflowComment = {}): Promise<void> {
     await tick();
     requireBackend();
-    await apiFetch(`/v1/operations/tests/${id}/reject`, { method: "POST", body: { comment: opts.comment } });
+    await apiFetch(`/v1/operations/tests/${id}/return`, { method: "POST", body: { comment: opts.comment } });
+    invalidate("tests", "audit", "dashboard", "test-comments");
+  },
+
+  /** Edit a draft or returned test (approved/in-review results are locked). */
+  async update(id: string, patch: {
+    inputData?: Record<string, unknown>;
+    calculatedResults?: Record<string, unknown>;
+    passFail?: "pass" | "fail" | "pending";
+    testDate?: string;
+    remarks?: string;
+  }): Promise<void> {
+    await tick();
+    requireBackend();
+    await apiFetch(`/v1/operations/tests/${id}`, {
+      method: "PATCH",
+      body: {
+        inputData: patch.inputData,
+        calculatedResults: patch.calculatedResults,
+        passFailStatus: patch.passFail === "pass" ? "pass" : patch.passFail === "fail" ? "fail" : undefined,
+        testDate: patch.testDate ? new Date(patch.testDate).toISOString() : undefined,
+        remarks: patch.remarks,
+      },
+    });
     invalidate("tests", "audit", "dashboard");
+  },
+
+  async comments(id: string): Promise<TestComment[]> {
+    await tick();
+    requireBackend();
+    const out = await apiFetch<{ items: TestComment[] }>(`/v1/operations/tests/${id}/comments`);
+    return out.items;
+  },
+
+  async addComment(id: string, body: string): Promise<TestComment> {
+    await tick();
+    requireBackend();
+    const c = await apiFetch<TestComment>(`/v1/operations/tests/${id}/comments`, { method: "POST", body: { body } });
+    invalidate("test-comments", "audit");
+    return c;
   },
 };
 

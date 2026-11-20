@@ -7,6 +7,7 @@ const statusMap: Record<string, { label: string; cls: string }> = {
   draft:           { label: "Draft",           cls: "badge-muted" },
   submitted:       { label: "In review",       cls: "badge-warn" },
   reviewed:        { label: "Reviewed",        cls: "badge-info" },
+  returned:        { label: "Returned",        cls: "badge-warn" },
   approved:        { label: "Approved",        cls: "badge-pass" },
   pending:         { label: "Pending",         cls: "badge-muted" },
   in_test:         { label: "In test",         cls: "badge-warn" },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useData } from "@/store/data-store";
+import { useProjectsQuery, useSamplesQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 
@@ -27,14 +27,16 @@ export function makeDefaultContext(): TestContext {
 export function TestContextBar({ value, onChange, defaultCategory }: Props) {
   const tt = useT();
   const loc = useLoc();
-  const projects = useData((s) => s.projects);
-  const samples = useData((s) => s.samples);
+  // Real data from the API (the old local store was never filled, so the pickers were empty).
+  const { data: projects = [] } = useProjectsQuery({});
+  const { data: samples = [] } = useSamplesQuery({ limit: 500 });
 
+  // Default to a project that has a sample of this test's type (a test needs one), else the first project.
   useEffect(() => {
-    if (!value.projectId && projects[0]) {
-      onChange({ ...value, projectId: projects[0].id });
-    }
-  }, [projects, value, onChange]);
+    if (value.projectId || projects.length === 0) return;
+    const withSample = projects.find((p) => samples.some((s) => s.projectId === p.id && (!defaultCategory || s.type === defaultCategory)));
+    onChange({ ...value, projectId: (withSample ?? projects[0]!).id });
+  }, [projects, samples, value, onChange, defaultCategory]);
 
   const projectSamples = useMemo(
     () => samples.filter((s) => s.projectId === value.projectId && (!defaultCategory || s.type === defaultCategory)),
@@ -69,7 +71,7 @@ export function TestContextBar({ value, onChange, defaultCategory }: Props) {
           value={value.sampleId}
           onChange={(e) => onChange({ ...value, sampleId: e.target.value })}
         >
-          <option value="">—</option>
+          <option value="">{projectSamples.length === 0 && value.projectId ? tt("No samples of this type in the project") : "—"}</option>
           {projectSamples.map((s) => (
             <option key={s.id} value={s.id}>{s.code} ({s.type})</option>
           ))}

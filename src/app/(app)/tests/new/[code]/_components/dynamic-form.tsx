@@ -2,18 +2,37 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
-import { ArrowLeft, ShieldCheck, Save, Send } from "lucide-react";
+import { useRouter, useSearchParams, notFound } from "next/navigation";
+import { ArrowLeft, ShieldCheck, Save, Send, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { schemas } from "@/lib/test-schemas";
 import { categoryMeta } from "@/lib/test-catalog";
-import { submitTest } from "@/lib/test-submit";
+import { submitTest, resubmitTest } from "@/lib/test-submit";
+import { useTestQuery, useTestCommentsQuery } from "@/server/queries";
+import { toast } from "@/components/ui/toast";
 import { evaluateTest, isBackendActive, type EngineEvaluation } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+/** Shows why the reviewer returned the test while the technician edits it. */
+function ReturnReason({ testId }: { testId: string }) {
+  const { data: thread = [] } = useTestCommentsQuery(testId);
+  const last = [...thread].reverse().find((c) => c.kind === "return");
+  if (!last) return null;
+  return (
+    <div className="rounded-lg border-2 border-amber-400/70 bg-amber-50 dark:bg-amber-950/20 p-4 flex items-start gap-3">
+      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <div className="font-semibold text-amber-800 dark:text-amber-200">Returned for correction</div>
+        <div className="text-sm mt-1 whitespace-pre-wrap break-words">
+          <span className="text-[rgb(var(--muted))]">{last.authorName || last.authorEmail}: </span>{last.body}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function DynamicTestForm({ code }: { code: string }) {
   const schema = schemas[code];
@@ -21,6 +40,19 @@ export function DynamicTestForm({ code }: { code: string }) {
 
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
+  const [saving, setSaving] = useState(false);
+
+  // Edit mode: /tests/new/<code>?edit=<test id> reopens a draft or returned test.
+  const editId = useSearchParams().get("edit");
+  const { data: editTest, isLoading: editLoading } = useTestQuery(editId ?? undefined);
+  const [prefilled, setPrefilled] = useState(false);
+  const editProblem =
+    !editId ? null
+    : editLoading ? null
+    : !editTest ? "That test could not be found."
+    : editTest.code !== schema.code ? `That test was created with form ${editTest.code}, not ${schema.code}.`
+    : editTest.status !== "returned" && editTest.status !== "draft" ? "This test is in review or approved and can no longer be edited."
+    : null;
 
   const initial: Record<string, number | string> = {};
   for (const sec of schema.sections) {
@@ -32,6 +64,21 @@ export function DynamicTestForm({ code }: { code: string }) {
     }
   }
   const [values, setValues] = useState<Record<string, number | string>>(initial);
+
+  useEffect(() => {
+    if (!editTest || prefilled || editProblem) return;
+    const known = new Set(schema.sections.flatMap((sec) => sec.fields.map((f) => f.key)));
+    const saved = editTest.inputData ?? {};
+    setValues((v) => {
+      const next = { ...v };
+      for (const [k, val] of Object.entries(saved)) {
+        if (known.has(k) && (typeof val === "number" || typeof val === "string")) next[k] = val;
+      }
+      return next;
+    });
+    setCtx((c) => ({ ...c, projectId: editTest.projectId, sampleId: editTest.sampleId, testDate: editTest.testDate.slice(0, 10) }));
+    setPrefilled(true);
+  }, [editTest, prefilled, editProblem, schema]);
 
   const computedResults = useMemo(() => schema.results.map((r) => {
     const raw = r.compute(values);
@@ -70,21 +117,45 @@ export function DynamicTestForm({ code }: { code: string }) {
     ? { value: +primary.raw.toFixed(primary.decimals ?? 2), unit: primary.unit ?? "", label: primary.label }
     : undefined;
 
-  const handleSubmit = (status: "draft" | "submitted") => {
+  const handleSubmit = async (status: "draft" | "submitted") => {
     const passFail = status === "draft"
       ? "pending"
       : passes.length === 0 ? "pending" : overall;
-    submitTest({
-      code: schema.code,
-      name: schema.name,
-      category: schema.category,
-      standard: schema.standard,
-      ctx,
-      status,
-      passFail,
-      primaryResult,
-    });
-    router.push("/tests");
+    // What gets stored with the test: the entered values and the engine's results.
+    const calculatedResults: Record<string, unknown> = server
+      ? server.results
+      : Object.fromEntries(computedResults.map((r) => [r.label, r.raw]));
+    setSaving(true);
+    try {
+      if (editId) {
+        await resubmitTest(editId, {
+          inputData: values,
+          calculatedResults: { ...calculatedResults, ...(primaryResult ? { primaryResult } : {}) },
+          passFail: passes.length === 0 ? "pending" : overall,
+          testDate: ctx.testDate,
+        });
+        toast.success("Corrections saved and test resubmitted");
+        router.push(`/tests/${editId}`);
+      } else {
+        await submitTest({
+          code: schema.code,
+          name: schema.name,
+          category: schema.category,
+          standard: schema.standard,
+          ctx,
+          status,
+          passFail,
+          primaryResult,
+          inputData: values,
+          calculatedResults,
+        });
+        router.push("/tests");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the test");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -106,17 +177,30 @@ export function DynamicTestForm({ code }: { code: string }) {
                 <ShieldCheck className="w-3 h-3" /> Saudi-specific
               </span>
             )}
-            <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
-              <Save className="w-4 h-4" /> Save draft
-            </button>
-            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")}>
-              <Send className="w-4 h-4" /> Submit
+            {!editId && (
+              <button className="btn btn-outline" onClick={() => handleSubmit("draft")} disabled={saving}>
+                <Save className="w-4 h-4" /> Save draft
+              </button>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => handleSubmit("submitted")}
+              disabled={saving || (!!editId && (!prefilled || !!editProblem))}
+            >
+              <Send className="w-4 h-4" /> {editId ? "Save corrections & resubmit" : "Submit"}
             </button>
           </div>
         }
       />
 
       <p className="text-sm text-[rgb(var(--muted))] -mt-4">{schema.description}</p>
+
+      {editId && !editProblem && <ReturnReason testId={editId} />}
+      {editProblem && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 dark:bg-rose-950/30 p-3 text-sm text-rose-700 dark:text-rose-300">
+          {editProblem} <Link href={editTest ? `/tests/${editTest.id}` : "/tests"} className="underline">Back to the test</Link>
+        </div>
+      )}
 
       <TestContextBar value={ctx} onChange={setCtx} defaultCategory={schema.category} />
 

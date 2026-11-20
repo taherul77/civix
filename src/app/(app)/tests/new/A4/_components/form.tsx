@@ -9,6 +9,7 @@ import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { toast } from "@/components/ui/toast";
 import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
 
 export function A4Form() {
@@ -30,13 +31,14 @@ export function A4Form() {
   const c3 = dSurface <= 25;
   const c4 = dAmbient <= 20;
   const localOverall = c1 && c2 && c3 && c4 ? "pass" : "fail";
-  const { server, error: serverError } = useServerVerdict("A4", {
+  const payload = {
     concreteTemperatureC: concreteT,
     ambientTemperatureC: ambientT,
     formworkTemperatureC: formworkT,
     cementContentKgM3: cement,
     coolingMeasures: cooling,
-  });
+  };
+  const { server, error: serverError } = useServerVerdict("A4", payload);
   const overall = verdictOf(server, localOverall);
 
   const Limit = ({ ok, label }: { ok: boolean; label: string }) => (
@@ -47,9 +49,10 @@ export function A4Form() {
 
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
-  const handleSubmit = (status: "draft" | "submitted") => {
+  const handleSubmit = async (status: "draft" | "submitted") => {
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
-    submitTest({
+    try {
+    await submitTest({
       code: "A4",
       name: "Concrete Placement Temperature",
       category: "concrete",
@@ -58,8 +61,13 @@ export function A4Form() {
       status,
       passFail,
       primaryResult: { value: +concreteT.toFixed(1), unit: "°C", label: "Placement T" },
+      inputData: payload,
+      calculatedResults: server?.results,
     });
     router.push("/tests");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the test");
+    }
   };
 
   return (
