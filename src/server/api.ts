@@ -1039,6 +1039,12 @@ export const audit = {
     });
     return { items: out.items.map(auditFromApi), total: out.total };
   },
+  /** Server-side SHA-256 chain verification (the browser cannot re-derive these hashes). */
+  async verify(): Promise<{ ok: boolean; brokenAt: string | null; checked: number }> {
+    await tick();
+    requireBackend();
+    return apiFetch("/v1/lab/audit/verify");
+  },
 };
 
 // ---------------------------------------------------------------------------
