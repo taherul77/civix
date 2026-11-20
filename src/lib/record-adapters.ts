@@ -112,14 +112,14 @@ export function sampleFromApi(s: ApiSample): Sample {
   };
 }
 
-/** Accepts "lat,lng" or "(lat,lng)" (Postgres POINT text). Rejects out-of-range values. */
+/** Parses the stored "lat,lng" string (extra trailing values such as altitude are ignored). */
 export function parseGps(raw: string | null | undefined): { lat: number; lng: number } | null {
   if (!raw) return null;
-  const m = raw.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?\s*$/);
-  if (!m) return null;
-  const lat = Number(m[1]);
-  const lng = Number(m[2]);
-  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+  const [ta, tb] = raw.split(",").map((v) => v.trim());
+  if (!ta || !tb) return null; // Number("") is 0, so reject empty tokens explicitly
+  const a = Number(ta), b = Number(tb);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.abs(a) <= 90 && Math.abs(b) <= 180 ? { lat: a, lng: b } : null;
 }
 
 // ---------------------------------------------------------------------------

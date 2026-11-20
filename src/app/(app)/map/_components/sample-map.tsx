@@ -38,10 +38,11 @@ const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
 export function SampleMap() {
   const tt = useT();
   const loc = useLoc();
-  const { data: samples = [] } = useSamplesQuery({});
+  const { data: samples = [] } = useSamplesQuery({ limit: 500 });
   const [hovered, setHovered] = useState<Site | null>(null);
 
-  // Real samples that carry GPS. Points outside the map frame are still listed.
+  // Real samples that carry GPS (up to 500). Points outside the map frame are
+  // still listed on the right but not drawn.
   const sitesGeo = useMemo<Site[]>(
     () => samples
       .filter((s) => s.gps)
@@ -73,7 +74,7 @@ export function SampleMap() {
             return <line key={lng} x1={x} x2={x} y1={0} y2={360} stroke="rgb(var(--muted) / 0.15)" strokeDasharray="2 4" />;
           })}
 
-          {sitesGeo.map((s) => {
+          {sitesGeo.filter((s) => s.lat >= minLat && s.lat <= maxLat && s.lng >= minLng && s.lng <= maxLng).map((s) => {
             const { x, y } = project(s.lat, s.lng);
             const c = typeColor[s.type] ?? "#64748b";
             return (

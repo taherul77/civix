@@ -57,6 +57,8 @@ export interface ListSamplesParams {
   type?: SampleRecord["type"] | "all";
   projectId?: string;
   q?: string;
+  /** Max rows (server default 100, max 500). */
+  limit?: number;
 }
 
 export interface ListTestsParams {
