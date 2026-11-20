@@ -1,3 +1,4 @@
+import { catalog } from "@/lib/test-catalog";
 /**
  * Backend row → frontend record adapters.
  *
@@ -127,6 +128,8 @@ export interface ApiTest {
   calculatedResults?: { primaryResult?: { value: number; unit: string; label?: string } } | Record<string, unknown> | null;
 }
 
+const catalogName = (code: string) => catalog.find((c) => c.code === code)?.name;
+
 export function testFromApi(t: ApiTest): Test {
   const status: Test["status"] =
     t.status === "submitted" ? "submitted" :
@@ -140,7 +143,9 @@ export function testFromApi(t: ApiTest): Test {
   return {
     id: t.id,
     code: t.testCode,
-    name: t.testType,
+    // Prefer the catalog name for the test code (e.g. "Potable Water Analysis");
+    // fall back to the stored category for custom/unknown codes.
+    name: catalogName(t.testCode) ?? t.testType,
     category: asCategory(t.testType),
     standard: [t.standardBody, t.standardNumber].filter(Boolean).join(" "),
     sampleId: t.sampleId,
