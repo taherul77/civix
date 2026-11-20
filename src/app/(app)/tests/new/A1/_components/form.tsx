@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Save, Send, Cable } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,6 +10,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
 import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
+import { useEditTest, ReturnReason, EditProblem } from "@/components/test-form/edit-support";
+import { resubmitTest, PartialSaveError } from "@/lib/test-submit";
 import { useEquipmentQuery } from "@/server/queries";
 import { useData } from "@/store/data-store";
 import { api } from "@/server/api";
@@ -81,6 +83,35 @@ export function A1Form() {
   const { server, error: serverError } = useServerVerdict("A1", payload);
   const overall = verdictOf(server, localOverall);
 
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard: state updates after the next render, so a double-click would get through.
+  const inFlight = useRef(false);
+  const edit = useEditTest("A1");
+  useEffect(() => {
+    if (!edit.test || edit.prefilled || edit.problem) return;
+    const d = (edit.test.inputData ?? {}) as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+    const fromEngine: Record<string, "cube_150" | "cyl_150x300" | "cyl_100x200"> = {
+      cube_150mm: "cube_150", cylinder_150x300mm: "cyl_150x300", cylinder_100x200mm: "cyl_100x200",
+    };
+    if (typeof d.specimenType === "string" && fromEngine[d.specimenType]) setSpecType(fromEngine[d.specimenType]!);
+    if (typeof d.castingDate === "string") setCastDate(d.castingDate);
+    if (typeof d.testDate === "string") setTestDate(d.testDate);
+    if (typeof d.ageDays === "string" && Number.isFinite(Number(d.ageDays))) setAge(Number(d.ageDays));
+    setDiameter((v) => num(d.diameterMm) ?? v);
+    setHeight((v) => num(d.heightMm) ?? v);
+    setLoad((v) => num(d.maxLoadKn) ?? v);
+    setLoadingRate((v) => num(d.loadingRateMpaS) ?? v);
+    setTemp((v) => num(d.temperatureC) ?? v);
+    setHumidity((v) => num(d.humidityPercent) ?? v);
+    setDesignStrength((v) => num(d.designStrengthMpa) ?? v);
+    if (Array.isArray(d.specimenLoadsKn) && d.specimenLoadsKn.every((x) => typeof x === "number")) {
+      setSpecimens((d.specimenLoadsKn as number[]).map((l, i) => ({ id: `C-${i + 1}`, load: l })));
+    }
+    edit.markPrefilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edit.test, edit.prefilled, edit.problem]);
+
   const tempWarn = temp < 18 || temp > 28 ? "Outside 20 ± 2 °C standard curing band" : undefined;
   const humWarn = humidity < 95 ? "SBC 304 requires RH ≥ 95% for moist curing" : undefined;
   const cubeWarn = !isCube ? "Saudi (SBC 304) projects should use 150 mm cubes" : undefined;
@@ -136,6 +167,27 @@ export function A1Form() {
   };
 
   const handleSubmit = async (status: "draft" | "submitted") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (edit.id) {
+      setSaving(true);
+      try {
+        await resubmitTest(edit.id, {
+          inputData: payload,
+          calculatedResults: { ...(server?.results ?? {}), primaryResult: { value: +main.fcCorr.toFixed(2), unit: "MPa", label: `f'c @ ${age}d` } },
+          passFail: overall,
+        });
+        toast.success("Corrections saved and test resubmitted");
+        router.push(`/tests/${edit.id}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not save the corrections");
+      } finally {
+        setSaving(false);
+      inFlight.current = false;
+      }
+      return;
+    }
+    setSaving(true);
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
     try {
     await submitTest({
@@ -153,6 +205,10 @@ export function A1Form() {
     router.push("/tests");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save the test");
+      if (e instanceof PartialSaveError) router.push(`/tests/${e.testId}`);
+    } finally {
+      setSaving(false);
+      inFlight.current = false;
     }
   };
 
@@ -185,17 +241,20 @@ export function A1Form() {
             <button type="button" onClick={pullFromEquipment} className="btn btn-outline">
               <Cable className="w-4 h-4" /> Pull from equipment
             </button>
-            <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
+            {!edit.id && <button className="btn btn-outline" onClick={() => handleSubmit("draft")} disabled={saving}>
               <Save className="w-4 h-4" /> Save draft
-            </button>
-            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")}>
-              <Send className="w-4 h-4" /> Submit for review
+            </button>}
+            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")} disabled={saving || (!!edit.id && !edit.ready)}>
+              <Send className="w-4 h-4" /> {edit.id ? "Save corrections & resubmit" : "Submit for review"}
             </button>
           </div>
         }
       />
 
-      <TestContextBar value={ctx} onChange={setCtx} defaultCategory="concrete" />
+      {edit.id && !edit.problem && <ReturnReason testId={edit.id} />}
+      {edit.problem && <EditProblem problem={edit.problem} testId={edit.test?.id} />}
+
+      {!edit.id && <TestContextBar value={ctx} onChange={setCtx} defaultCategory="concrete" />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

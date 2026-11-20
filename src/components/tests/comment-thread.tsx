@@ -33,7 +33,7 @@ export function CommentThread({ testId }: { testId: string }) {
     setBusy(true);
     try {
       const ok = await mutate(() => api.tests.addComment(testId, body), "Comment added");
-      if (ok) setText("");
+      if (ok !== null) setText("");
     } finally {
       setBusy(false);
     }

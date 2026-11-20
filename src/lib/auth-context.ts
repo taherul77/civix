@@ -16,18 +16,22 @@ export function useActor(): Actor | null {
   return { name: user.name, email: user.email, role: user.role };
 }
 
-/** Hook: returns true if the signed-in user has `perm`. Super Admin bypasses
- *  every check so the platform owner always has full access regardless of the
- *  JWT permissions list or any tenant role customization. */
+type PermUser = { role: string; isSuperAdmin?: boolean; permissions?: string[] } | null | undefined;
+
+/** The single permission rule (used by useCan and the API-layer guard).
+ *  Super Admin bypasses; otherwise the backend's permission list is the truth (tenant-defined roles are
+ *  not in the built-in table); sessions saved before that list existed fall back to the role-name table. */
+export function userCan(user: PermUser, perm: Permission): boolean {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  if (user.permissions) return user.permissions.includes(perm);
+  return hasPermission(user.role, perm);
+}
+
+/** Hook: returns true if the signed-in user has `perm`. */
 export function useCan(perm: Permission): boolean {
-  const role = useApp((s) => s.user?.role);
-  const isSuperAdmin = useApp((s) => s.user?.isSuperAdmin ?? false);
-  const permissions = useApp((s) => s.user?.permissions);
-  if (isSuperAdmin) return true;
-  // The backend's permission list is the truth (tenant-defined roles are not in the built-in table).
-  // Sessions saved before this field existed fall back to the role-name table.
-  if (permissions) return permissions.includes(perm);
-  return hasPermission(role, perm);
+  const user = useApp((s) => s.user);
+  return userCan(user, perm);
 }
 
 /** Imperative read — for store actions called outside React. */

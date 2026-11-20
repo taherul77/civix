@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Save, Send, Droplets } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +11,8 @@ import { TestContextBar, makeDefaultContext, type TestContext } from "@/componen
 import { submitTest } from "@/lib/test-submit";
 import { toast } from "@/components/ui/toast";
 import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
+import { useEditTest, ReturnReason, EditProblem } from "@/components/test-form/edit-support";
+import { resubmitTest, PartialSaveError } from "@/lib/test-submit";
 import { cn } from "@/lib/utils";
 
 interface Param {
@@ -83,6 +85,30 @@ export function H1Form() {
   const { server, error: serverError } = useServerVerdict("H1", payload);
   const overall = verdictOf(server, localOverall);
 
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard: state updates after the next render, so a double-click would get through.
+  const inFlight = useRef(false);
+  const edit = useEditTest("H1");
+  useEffect(() => {
+    if (!edit.test || edit.prefilled || edit.problem) return;
+    const d = (edit.test.inputData ?? {}) as Record<string, unknown>;
+    // saved (engine) names -> form keys
+    const map: Record<string, string> = {
+      ph: "ph", turbidityNtu: "turbidity", colorTcu: "color", tdsMgL: "tds", chlorideMgL: "chloride", sulfateMgL: "sulfate",
+      nitrateMgL: "nitrate", fluorideMgL: "fluoride", ironMgL: "iron", manganeseMgL: "manganese", leadMgL: "lead",
+      arsenicMgL: "arsenic", cadmiumMgL: "cadmium", residualChlorineMgL: "residualCl", totalColiformMpn: "coliform", eColiMpn: "ecoli",
+    };
+    setValues((v) => {
+      const next = { ...v };
+      for (const [saved, key] of Object.entries(map)) if (typeof d[saved] === "number") next[key] = d[saved] as number;
+      return next;
+    });
+    if (typeof d.samplingPoint === "string") setSamplingPoint(d.samplingPoint);
+    if (typeof d.sampleType === "string") setSampleType(d.sampleType);
+    edit.markPrefilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edit.test, edit.prefilled, edit.problem]);
+
   const groups = (Object.keys(groupLabels) as (keyof typeof groupLabels)[]).map((g) => ({
     key: g,
     label: groupLabels[g],
@@ -92,6 +118,27 @@ export function H1Form() {
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
   const handleSubmit = async (status: "draft" | "submitted") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (edit.id) {
+      setSaving(true);
+      try {
+        await resubmitTest(edit.id, {
+          inputData: payload,
+          calculatedResults: { ...(server?.results ?? {}), primaryResult: { value: +values.tds!.toFixed(0), unit: "mg/L", label: "TDS" } },
+          passFail: overall,
+        });
+        toast.success("Corrections saved and test resubmitted");
+        router.push(`/tests/${edit.id}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not save the corrections");
+      } finally {
+        setSaving(false);
+      inFlight.current = false;
+      }
+      return;
+    }
+    setSaving(true);
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
     try {
     await submitTest({
@@ -109,6 +156,10 @@ export function H1Form() {
     router.push("/tests");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save the test");
+      if (e instanceof PartialSaveError) router.push(`/tests/${e.testId}`);
+    } finally {
+      setSaving(false);
+      inFlight.current = false;
     }
   };
 
@@ -126,17 +177,20 @@ export function H1Form() {
             <span className="badge badge-pass inline-flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> Saudi-specific
             </span>
-            <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
+            {!edit.id && <button className="btn btn-outline" onClick={() => handleSubmit("draft")} disabled={saving}>
               <Save className="w-4 h-4" /> Save draft
-            </button>
-            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")}>
-              <Send className="w-4 h-4" /> Submit for review
+            </button>}
+            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")} disabled={saving || (!!edit.id && !edit.ready)}>
+              <Send className="w-4 h-4" /> {edit.id ? "Save corrections & resubmit" : "Submit for review"}
             </button>
           </div>
         }
       />
 
-      <TestContextBar value={ctx} onChange={setCtx} defaultCategory="water" />
+      {edit.id && !edit.problem && <ReturnReason testId={edit.id} />}
+      {edit.problem && <EditProblem problem={edit.problem} testId={edit.test?.id} />}
+
+      {!edit.id && <TestContextBar value={ctx} onChange={setCtx} defaultCategory="water" />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

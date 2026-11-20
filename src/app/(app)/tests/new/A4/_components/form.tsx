@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck, AlertTriangle, Save, Send, Thermometer } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +11,8 @@ import { TestContextBar, makeDefaultContext, type TestContext } from "@/componen
 import { submitTest } from "@/lib/test-submit";
 import { toast } from "@/components/ui/toast";
 import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
+import { useEditTest, ReturnReason, EditProblem } from "@/components/test-form/edit-support";
+import { resubmitTest, PartialSaveError } from "@/lib/test-submit";
 
 export function A4Form() {
   const [concreteT, setConcreteT] = useState(33);
@@ -41,6 +43,23 @@ export function A4Form() {
   const { server, error: serverError } = useServerVerdict("A4", payload);
   const overall = verdictOf(server, localOverall);
 
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard: state updates after the next render, so a double-click would get through.
+  const inFlight = useRef(false);
+  const edit = useEditTest("A4");
+  useEffect(() => {
+    if (!edit.test || edit.prefilled || edit.problem) return;
+    const d = (edit.test.inputData ?? {}) as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+    setConcreteT((v) => num(d.concreteTemperatureC) ?? v);
+    setAmbientT((v) => num(d.ambientTemperatureC) ?? v);
+    setFormworkT((v) => num(d.formworkTemperatureC) ?? v);
+    setCement((v) => num(d.cementContentKgM3) ?? v);
+    if (typeof d.coolingMeasures === "string") setCooling(d.coolingMeasures);
+    edit.markPrefilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edit.test, edit.prefilled, edit.problem]);
+
   const Limit = ({ ok, label }: { ok: boolean; label: string }) => (
     <li className={ok ? "text-emerald-600" : "text-rose-600 font-medium"}>
       {ok ? "✓" : "✗"} {label}
@@ -50,6 +69,27 @@ export function A4Form() {
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
   const handleSubmit = async (status: "draft" | "submitted") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (edit.id) {
+      setSaving(true);
+      try {
+        await resubmitTest(edit.id, {
+          inputData: payload,
+          calculatedResults: { ...(server?.results ?? {}), primaryResult: { value: +concreteT.toFixed(1), unit: "°C", label: "Placement T" } },
+          passFail: overall,
+        });
+        toast.success("Corrections saved and test resubmitted");
+        router.push(`/tests/${edit.id}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not save the corrections");
+      } finally {
+        setSaving(false);
+      inFlight.current = false;
+      }
+      return;
+    }
+    setSaving(true);
     const passFail = status === "draft" ? "pending" : (overall as "pass" | "fail");
     try {
     await submitTest({
@@ -67,6 +107,10 @@ export function A4Form() {
     router.push("/tests");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save the test");
+      if (e instanceof PartialSaveError) router.push(`/tests/${e.testId}`);
+    } finally {
+      setSaving(false);
+      inFlight.current = false;
     }
   };
 
@@ -84,11 +128,11 @@ export function A4Form() {
             <span className="badge badge-pass inline-flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> Saudi-mandatory
             </span>
-            <button className="btn btn-outline" onClick={() => handleSubmit("draft")}>
+            {!edit.id && <button className="btn btn-outline" onClick={() => handleSubmit("draft")} disabled={saving}>
               <Save className="w-4 h-4" /> Save draft
-            </button>
-            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")}>
-              <Send className="w-4 h-4" /> Submit for review
+            </button>}
+            <button className="btn btn-primary" onClick={() => handleSubmit("submitted")} disabled={saving || (!!edit.id && !edit.ready)}>
+              <Send className="w-4 h-4" /> {edit.id ? "Save corrections & resubmit" : "Submit for review"}
             </button>
           </div>
         }
@@ -107,7 +151,10 @@ export function A4Form() {
         </div>
       )}
 
-      <TestContextBar value={ctx} onChange={setCtx} defaultCategory="concrete" />
+      {edit.id && !edit.problem && <ReturnReason testId={edit.id} />}
+      {edit.problem && <EditProblem problem={edit.problem} testId={edit.test?.id} />}
+
+      {!edit.id && <TestContextBar value={ctx} onChange={setCtx} defaultCategory="concrete" />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

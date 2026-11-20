@@ -53,9 +53,21 @@ export async function submitTest(args: SubmitArgs): Promise<string> {
   });
 
   if (args.status === "submitted" && actor) {
-    await api.tests.submit(created.id);
+    try {
+      await api.tests.submit(created.id);
+    } catch (e) {
+      // The draft exists: send the user to it instead of letting a retry create a duplicate.
+      throw new PartialSaveError(created.id, e instanceof Error ? e.message : "unknown error");
+    }
   }
   return args.code;
+}
+
+/** The test was saved as a draft but submitting it for review failed. */
+export class PartialSaveError extends Error {
+  constructor(public testId: string, reason: string) {
+    super(`Saved as a draft, but submitting for review failed: ${reason}. Open it to submit again.`);
+  }
 }
 
 /**

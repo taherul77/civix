@@ -663,7 +663,7 @@ export const tests = {
       body: {
         inputData: patch.inputData,
         calculatedResults: patch.calculatedResults,
-        passFailStatus: patch.passFail === "pass" ? "pass" : patch.passFail === "fail" ? "fail" : undefined,
+        passFailStatus: patch.passFail,
         testDate: patch.testDate ? new Date(patch.testDate).toISOString() : undefined,
         remarks: patch.remarks,
       },

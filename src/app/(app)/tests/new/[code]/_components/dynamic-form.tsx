@@ -1,38 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams, notFound } from "next/navigation";
-import { ArrowLeft, ShieldCheck, Save, Send, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, notFound } from "next/navigation";
+import { ArrowLeft, ShieldCheck, Save, Send } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { schemas } from "@/lib/test-schemas";
 import { categoryMeta } from "@/lib/test-catalog";
-import { submitTest, resubmitTest } from "@/lib/test-submit";
-import { useTestQuery, useTestCommentsQuery } from "@/server/queries";
+import { submitTest, resubmitTest, PartialSaveError } from "@/lib/test-submit";
+import { useEditTest, ReturnReason, EditProblem } from "@/components/test-form/edit-support";
 import { toast } from "@/components/ui/toast";
 import { evaluateTest, isBackendActive, type EngineEvaluation } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-
-/** Shows why the reviewer returned the test while the technician edits it. */
-function ReturnReason({ testId }: { testId: string }) {
-  const { data: thread = [] } = useTestCommentsQuery(testId);
-  const last = [...thread].reverse().find((c) => c.kind === "return");
-  if (!last) return null;
-  return (
-    <div className="rounded-lg border-2 border-amber-400/70 bg-amber-50 dark:bg-amber-950/20 p-4 flex items-start gap-3">
-      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-      <div className="min-w-0">
-        <div className="font-semibold text-amber-800 dark:text-amber-200">Returned for correction</div>
-        <div className="text-sm mt-1 whitespace-pre-wrap break-words">
-          <span className="text-[rgb(var(--muted))]">{last.authorName || last.authorEmail}: </span>{last.body}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function DynamicTestForm({ code }: { code: string }) {
   const schema = schemas[code];
@@ -41,18 +23,15 @@ export function DynamicTestForm({ code }: { code: string }) {
   const router = useRouter();
   const [ctx, setCtx] = useState<TestContext>(makeDefaultContext());
   const [saving, setSaving] = useState(false);
+  // Synchronous guard: state updates after the next render, so a double-click would get through.
+  const inFlight = useRef(false);
 
   // Edit mode: /tests/new/<code>?edit=<test id> reopens a draft or returned test.
-  const editId = useSearchParams().get("edit");
-  const { data: editTest, isLoading: editLoading } = useTestQuery(editId ?? undefined);
-  const [prefilled, setPrefilled] = useState(false);
-  const editProblem =
-    !editId ? null
-    : editLoading ? null
-    : !editTest ? "That test could not be found."
-    : editTest.code !== schema.code ? `That test was created with form ${editTest.code}, not ${schema.code}.`
-    : editTest.status !== "returned" && editTest.status !== "draft" ? "This test is in review or approved and can no longer be edited."
-    : null;
+  const edit = useEditTest(schema.code);
+  const editId = edit.id;
+  const editTest = edit.test;
+  const editProblem = edit.problem;
+  const prefilled = edit.prefilled;
 
   const initial: Record<string, number | string> = {};
   for (const sec of schema.sections) {
@@ -76,8 +55,8 @@ export function DynamicTestForm({ code }: { code: string }) {
       }
       return next;
     });
-    setCtx((c) => ({ ...c, projectId: editTest.projectId, sampleId: editTest.sampleId, testDate: editTest.testDate.slice(0, 10) }));
-    setPrefilled(true);
+    edit.markPrefilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editTest, prefilled, editProblem, schema]);
 
   const computedResults = useMemo(() => schema.results.map((r) => {
@@ -118,6 +97,8 @@ export function DynamicTestForm({ code }: { code: string }) {
     : undefined;
 
   const handleSubmit = async (status: "draft" | "submitted") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     const passFail = status === "draft"
       ? "pending"
       : passes.length === 0 ? "pending" : overall;
@@ -132,7 +113,6 @@ export function DynamicTestForm({ code }: { code: string }) {
           inputData: values,
           calculatedResults: { ...calculatedResults, ...(primaryResult ? { primaryResult } : {}) },
           passFail: passes.length === 0 ? "pending" : overall,
-          testDate: ctx.testDate,
         });
         toast.success("Corrections saved and test resubmitted");
         router.push(`/tests/${editId}`);
@@ -153,8 +133,10 @@ export function DynamicTestForm({ code }: { code: string }) {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save the test");
+      if (e instanceof PartialSaveError) router.push(`/tests/${e.testId}`);
     } finally {
       setSaving(false);
+      inFlight.current = false;
     }
   };
 
@@ -196,13 +178,9 @@ export function DynamicTestForm({ code }: { code: string }) {
       <p className="text-sm text-[rgb(var(--muted))] -mt-4">{schema.description}</p>
 
       {editId && !editProblem && <ReturnReason testId={editId} />}
-      {editProblem && (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 dark:bg-rose-950/30 p-3 text-sm text-rose-700 dark:text-rose-300">
-          {editProblem} <Link href={editTest ? `/tests/${editTest.id}` : "/tests"} className="underline">Back to the test</Link>
-        </div>
-      )}
+      {editProblem && <EditProblem problem={editProblem} testId={editTest?.id} />}
 
-      <TestContextBar value={ctx} onChange={setCtx} defaultCategory={schema.category} />
+      {!editId && <TestContextBar value={ctx} onChange={setCtx} defaultCategory={schema.category} />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

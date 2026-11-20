@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileCheck, FileText, Send, RotateCcw, Pencil, AlertTriangle } from "lucide-react";
+import { ArrowLeft, FileCheck, FileText, Send, RotateCcw, Pencil, AlertTriangle, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Modal } from "@/components/ui/modal";
+import { ReturnDialog } from "@/components/tests/return-dialog";
 import { CommentThread } from "@/components/tests/comment-thread";
 import { catalog } from "@/lib/test-catalog";
 import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery, useTestCommentsQuery } from "@/server/queries";
@@ -31,8 +31,7 @@ export function TestDetailView({ id }: { id: string }) {
   const canReview = useCan("test:review");
   const { data: thread = [] } = useTestCommentsQuery(id);
   const [returning, setReturning] = useState(false);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
+  const canSign = useCan("test:sign");
 
   // 404 only after the lookup finished; at first render `test` is still undefined.
   if (!test) {
@@ -48,20 +47,14 @@ export function TestDetailView({ id }: { id: string }) {
   // A returned/draft test is outside the review cycle: earlier review/approval events no longer count.
   const cycleOpen = test.status === "returned" || test.status === "draft";
   const lastReturn = [...thread].reverse().find((c) => c.kind === "return");
-  // Bespoke forms (A1/A4/H1) cannot be reopened for editing yet; every catalog form that uses the generic form can.
-  const BESPOKE_FORMS = ["A1", "A4", "H1"];
-  const editHref = !BESPOKE_FORMS.includes(test.code) && catalog.some((c) => c.code === test.code)
-    ? `/tests/new/${test.code}?edit=${test.id}`
-    : null;
+  // Every catalog form supports ?edit=<id> (prefilled from the saved inputs).
+  const editHref = catalog.some((c) => c.code === test.code) ? `/tests/new/${test.code}?edit=${test.id}` : null;
 
-  const doReturn = async () => {
-    setBusy(true);
-    try {
-      const ok = await mutate(() => api.tests.return(test.id, { comment: reason.trim() }), "Returned for correction");
-      if (ok !== null) { setReturning(false); setReason(""); } // null = failed (toast already shown)
-    } finally {
-      setBusy(false);
-    }
+  // Approved but not signed yet (e.g. signing failed after approving): sign from here.
+  const needsSignature = test.status === "approved" && !signEvt;
+  const signNow = () => {
+    const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
+    return mutate(() => api.tests.sign(test.id, { certificateSerial: serial }), "Signed & locked");
   };
 
   return (
@@ -110,6 +103,11 @@ export function TestDetailView({ id }: { id: string }) {
                 title={tt("Send back for review without changing the data")}
               >
                 <Send className="w-4 h-4" /> {tt("Resubmit unchanged")}
+              </button>
+            )}
+            {needsSignature && (
+              <button onClick={signNow} disabled={!canSign} className="btn btn-outline" title={canSign ? "" : tt("Only Approvers can sign.")}>
+                <ShieldCheck className="w-4 h-4" /> {tt("Sign")}
               </button>
             )}
             <Link href={`/tests/${test.id}/report`} className="btn btn-primary">
@@ -219,33 +217,11 @@ export function TestDetailView({ id }: { id: string }) {
 
       <CommentThread testId={test.id} />
 
-      <Modal
+      <ReturnDialog
         open={returning}
         onClose={() => setReturning(false)}
-        title={tt("Return for correction")}
-        size="md"
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => setReturning(false)}>{tt("Cancel")}</button>
-            <button className="btn btn-primary" onClick={doReturn} disabled={busy || reason.trim().length < 3}>
-              <RotateCcw className="w-4 h-4" /> {tt("Return to technician")}
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-[rgb(var(--muted))] mb-2">{tt("Say what needs to be corrected. The technician sees this on the test.")}</p>
-        <textarea
-          className="input min-h-[110px]"
-          autoFocus
-          value={reason}
-          maxLength={2000}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder={tt("e.g. The load reading looks wrong, please re-check the gauge and re-enter it.")}
-        />
-        {reason.trim().length > 0 && reason.trim().length < 3 && (
-          <p className="text-xs text-rose-600 mt-1">{tt("Please write a few words.")}</p>
-        )}
-      </Modal>
+        onConfirm={async (reason) => (await mutate(() => api.tests.return(test.id, { comment: reason }), "Returned for correction")) !== null}
+      />
     </div>
   );
 }

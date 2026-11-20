@@ -5,7 +5,7 @@ import { useState } from "react";
 import { CheckCircle2, XCircle, MessageSquare, FileSignature, Lock, AlertTriangle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CommentThread } from "@/components/tests/comment-thread";
-import { toast } from "@/components/ui/toast";
+import { ReturnDialog } from "@/components/tests/return-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTestsQuery } from "@/server/queries";
 import { api } from "@/server/api";
@@ -45,13 +45,13 @@ export function ReviewWorkbench() {
     if (ok !== null) reset();
   };
 
-  // The reviewer must say what to correct; the API enforces the same rule.
-  const reasonOk = comment.trim().length >= 3;
-  const onReject = async () => {
-    if (!test) return;
-    if (!reasonOk) { toast.warn("Write what needs to be corrected before returning the test."); return; }
-    const ok = await mutate(() => api.tests.return(test.id, { comment: comment.trim() }), "Returned for correction");
+  // Returning asks for its own reason (separate from approval notes); the API enforces it too.
+  const [returning, setReturning] = useState(false);
+  const doReturn = async (reason: string) => {
+    if (!test) return false;
+    const ok = await mutate(() => api.tests.return(test.id, { comment: reason }), "Returned for correction");
     if (ok !== null) reset();
+    return ok !== null;
   };
 
   const onApprove = () => setDecision("approve");
@@ -60,8 +60,11 @@ export function ReviewWorkbench() {
     if (!test) return;
     const serial = `7B:11:A8:${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
     // Order matters: the API only allows signing a test that is already approved.
-    const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved");
-    if (apvOk === null) return;
+    // Resumable: if an earlier attempt already approved the test, only the signature is missing.
+    if (test.status !== "approved") {
+      const apvOk = await mutate(() => api.tests.approve(test.id, { comment }), "Approved");
+      if (apvOk === null) return;
+    }
     const signOk = await mutate(() => api.tests.sign(test.id, { certificateSerial: serial }), "Signed & locked");
     if (signOk === null) return;
     setSigned(true);
@@ -162,7 +165,6 @@ export function ReviewWorkbench() {
               placeholder={tt("Add your review notes (visible in audit log)...")}
               disabled={!actor || (!canReview && !canApprove)}
             />
-            <p className="text-xs text-[rgb(var(--muted))] -mt-2">{tt("Required when returning a test for correction.")}</p>
 
             <div className="flex flex-wrap gap-2">
               {test.status === "submitted" && (
@@ -188,10 +190,9 @@ export function ReviewWorkbench() {
               </button>
 
               <button
-                onClick={onReject}
-                disabled={(!canReview && !canApprove) || !reasonOk}
+                onClick={() => setReturning(true)}
+                disabled={!canReview && !canApprove}
                 className="btn btn-outline flex-1 min-w-[200px]"
-                title={reasonOk ? "" : tt("Write what needs to be corrected first")}
               >
                 <XCircle className="w-4 h-4" /> {tt("Return for correction")}
               </button>
@@ -224,6 +225,7 @@ export function ReviewWorkbench() {
           </div>
 
           <CommentThread testId={test.id} />
+          <ReturnDialog open={returning} onClose={() => setReturning(false)} onConfirm={doReturn} />
         </div>
       )}
     </div>
