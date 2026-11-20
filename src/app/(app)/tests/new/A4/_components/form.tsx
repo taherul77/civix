@@ -9,6 +9,7 @@ import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
 
 export function A4Form() {
   const [concreteT, setConcreteT] = useState(33);
@@ -28,7 +29,15 @@ export function A4Form() {
   const c2 = internal <= 65;
   const c3 = dSurface <= 25;
   const c4 = dAmbient <= 20;
-  const overall = c1 && c2 && c3 && c4 ? "pass" : "fail";
+  const localOverall = c1 && c2 && c3 && c4 ? "pass" : "fail";
+  const { server, error: serverError } = useServerVerdict("A4", {
+    concreteTemperatureC: concreteT,
+    ambientTemperatureC: ambientT,
+    formworkTemperatureC: formworkT,
+    cementContentKgM3: cement,
+    coolingMeasures: cooling,
+  });
+  const overall = verdictOf(server, localOverall);
 
   const Limit = ({ ok, label }: { ok: boolean; label: string }) => (
     <li className={ok ? "text-emerald-600" : "text-rose-600 font-medium"}>
@@ -142,6 +151,8 @@ export function A4Form() {
               <StatusBadge value={overall} />
             </div>
 
+            {server && <p className="-mt-2 mb-3 text-[11px] text-emerald-600 inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Verified by server</p>}
+            {serverError && <p className="-mt-2 mb-3 text-[11px] text-amber-600">Server check unavailable: {serverError}. Showing local preview.</p>}
             <div className="space-y-3">
               <Result label="Concrete T (placement)" value={concreteT.toFixed(1)} unit="°C" status={c1 ? "pass" : "fail"} />
               <Result label="Internal T (estimated)" value={internal.toFixed(1)} unit="°C" status={c2 ? "pass" : "fail"} />

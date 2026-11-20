@@ -9,6 +9,7 @@ import { FormSection, Field, Result } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
 import { useEquipmentQuery } from "@/server/queries";
 import { useData } from "@/store/data-store";
 import { api } from "@/server/api";
@@ -61,7 +62,23 @@ export function A1Form() {
 
   const designOk = main.fcCorr >= 0.85 * designStrength;
   const avgOk = avgFc >= designStrength;
-  const overall = designOk && avgOk ? "pass" : "fail";
+  const localOverall = designOk && avgOk ? "pass" : "fail";
+  const { server, error: serverError } = useServerVerdict("A1", {
+    specimenType: ({ cube_150: "cube_150mm", cyl_150x300: "cylinder_150x300mm", cyl_100x200: "cylinder_100x200mm" } as const)[specType],
+    specimenId: specimens[0]?.id ?? "C-1",
+    castingDate: castDate,
+    testDate,
+    ageDays: String(age),
+    diameterMm: diameter,
+    heightMm: height,
+    maxLoadKn: load,
+    loadingRateMpaS: loadingRate,
+    temperatureC: temp,
+    humidityPercent: humidity,
+    designStrengthMpa: designStrength,
+    specimenLoadsKn: specimens.map((sp) => sp.load),
+  });
+  const overall = verdictOf(server, localOverall);
 
   const tempWarn = temp < 18 || temp > 28 ? "Outside 20 ± 2 °C standard curing band" : undefined;
   const humWarn = humidity < 95 ? "SBC 304 requires RH ≥ 95% for moist curing" : undefined;
@@ -295,6 +312,9 @@ export function A1Form() {
               <h3 className="font-semibold">Live results</h3>
               <StatusBadge value={overall} />
             </div>
+            {server && <p className="-mt-2 mb-3 text-[11px] text-emerald-600 inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Verified by server</p>}
+            {serverError && <p className="-mt-2 mb-3 text-[11px] text-amber-600">Server check unavailable: {serverError}. Showing local preview.</p>}
+            {server?.warnings.map((w) => <p key={w} className="mb-2 text-xs text-amber-600">⚠ {w}</p>)}
 
             <div className="space-y-3">
               <Result label="Cross-sectional area" value={area.toFixed(1)} unit="mm²" />

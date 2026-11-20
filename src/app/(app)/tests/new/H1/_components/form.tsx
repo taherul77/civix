@@ -9,6 +9,7 @@ import { FormSection, Field } from "@/components/test-form/section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TestContextBar, makeDefaultContext, type TestContext } from "@/components/test-form/context-bar";
 import { submitTest } from "@/lib/test-submit";
+import { useServerVerdict, verdictOf } from "@/hooks/use-server-verdict";
 import { cn } from "@/lib/utils";
 
 interface Param {
@@ -69,7 +70,16 @@ export function H1Form() {
   const evaluations = useMemo(() => PARAMS.map((p) => ({ p, v: values[p.key], s: statusOf(p, values[p.key]) })), [values]);
   const failures = evaluations.filter((e) => e.s === "fail").length;
   const warnings = evaluations.filter((e) => e.s === "warn").length;
-  const overall = failures === 0 ? "pass" : "fail";
+  const localOverall = failures === 0 ? "pass" : "fail";
+  const { server, error: serverError } = useServerVerdict("H1", {
+    samplingPoint, sampleType,
+    ph: values.ph!, turbidityNtu: values.turbidity!, colorTcu: values.color!, tdsMgL: values.tds!,
+    chlorideMgL: values.chloride!, sulfateMgL: values.sulfate!, nitrateMgL: values.nitrate!,
+    fluorideMgL: values.fluoride!, ironMgL: values.iron!, manganeseMgL: values.manganese!,
+    leadMgL: values.lead!, arsenicMgL: values.arsenic!, cadmiumMgL: values.cadmium!,
+    residualChlorineMgL: values.residualCl!, totalColiformMpn: values.coliform!, eColiMpn: values.ecoli!,
+  });
+  const overall = verdictOf(server, localOverall);
 
   const groups = (Object.keys(groupLabels) as (keyof typeof groupLabels)[]).map((g) => ({
     key: g,
@@ -188,6 +198,9 @@ export function H1Form() {
               </h3>
               <StatusBadge value={overall} />
             </div>
+            {server && <p className="-mt-2 mb-3 text-[11px] text-emerald-600 inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Verified by server</p>}
+            {serverError && <p className="-mt-2 mb-3 text-[11px] text-amber-600">Server check unavailable: {serverError}. Showing local preview.</p>}
+            {server?.warnings.map((w) => <p key={w} className="mb-2 text-xs text-amber-600">⚠ {w}</p>)}
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg p-3 bg-emerald-500/10 border border-emerald-500/30">
