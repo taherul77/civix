@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Filter, FileCheck } from "lucide-react";
+import { Filter, FileCheck, FlaskConical } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { useTestsQuery, useSamplesQuery, useProjectsQuery } from "@/server/queries";
@@ -143,7 +144,14 @@ export function TestsExplorer() {
           .join(" ").toLowerCase().includes(q)
       }
       toolbar={toolbar}
-      empty={tt("No tests match your filters.")}
+      empty={
+        <EmptyState
+          icon={FlaskConical}
+          height={200}
+          title={tt("No tests found")}
+          hint={tt("Adjust the filters, or start a new test from the catalog.")}
+        />
+      }
     />
   );
 }

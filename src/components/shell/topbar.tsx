@@ -11,7 +11,7 @@ import {
 import { useApp } from "@/store/app-store";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { notifications } from "@/lib/mock-extra";
+import { useLiveNotifications } from "@/hooks/use-live-notifications";
 import { usePendingCount } from "@/lib/auto-translate";
 
 function humanize(seg: string) {
@@ -43,6 +43,7 @@ export function Topbar() {
   const ref = useRef<HTMLDivElement>(null);
 
   const segments = pathname.split("/").filter(Boolean);
+  const notifications = useLiveNotifications();
   const unread = notifications.filter((n) => !n.read).length;
   const pageTitle = tt(segments.length === 0 ? "Dashboard" : humanize(segments[segments.length - 1]));
 
@@ -220,6 +221,7 @@ function MsgPanel({ onClose }: { onClose: () => void }) {
 
 function BellPanel({ onClose }: { onClose: () => void }) {
   const tt = useT();
+  const notifications = useLiveNotifications();
   return (
     <PanelShell>
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-1 bg-gradient-to-r from-brand-500/10 to-rose-500/10">
