@@ -6,7 +6,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4">
       <ReportToolbar testId={id} />
-      <ReportDocument id={id} />
+      {/* The report is a fixed paper layout: on phones it scrolls sideways instead of overflowing the page. */}
+      <div className="overflow-x-auto print:overflow-visible">
+        <ReportDocument id={id} />
+      </div>
     </div>
   );
 }

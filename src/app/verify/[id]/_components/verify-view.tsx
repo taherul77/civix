@@ -104,7 +104,12 @@ const STATE_BANNER: Record<NonNullable<VerifyResult["state"]>, { tone: string; t
 };
 
 function ReportCard({ r }: { r: VerifyResult }) {
-  const conformOk = r.conformity === "conforms";
+  // Only a "valid" report (or an older backend that sends no state) is trusted. For
+  // modified/superseded/unsealed reports the recorded result is shown as unverified,
+  // never with the green "PASS" styling.
+  const trusted = !r.state || r.state === "valid";
+  const conformOk = trusted && r.conformity === "conforms";
+  const failed = trusted && r.conformity === "does_not_conform";
   const signed = !!r.signatureSerial;
   const banner = r.state ? STATE_BANNER[r.state] : null;
   return (
@@ -124,7 +129,7 @@ function ReportCard({ r }: { r: VerifyResult }) {
           "card p-6 border-2",
           conformOk
             ? "border-emerald-500/60 bg-emerald-50/40 dark:bg-emerald-950/20"
-            : r.conformity === "does_not_conform"
+            : failed
             ? "border-rose-500/60 bg-rose-50/40 dark:bg-rose-950/20"
             : "border-slate-300 dark:border-slate-800"
         )}
@@ -132,7 +137,7 @@ function ReportCard({ r }: { r: VerifyResult }) {
         <div className="flex items-start gap-3">
           {conformOk ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 mt-0.5" />
-          ) : r.conformity === "does_not_conform" ? (
+          ) : failed ? (
             <XCircle className="w-7 h-7 text-rose-600 shrink-0 mt-0.5" />
           ) : (
             <ShieldAlert className="w-7 h-7 text-slate-500 shrink-0 mt-0.5" />
@@ -142,7 +147,8 @@ function ReportCard({ r }: { r: VerifyResult }) {
               {r.reportNumber}
             </div>
             <div className="font-bold text-xl mt-1">
-              {conformOk
+              {!trusted && "Recorded result (unverified): "}
+              {r.conformity === "conforms"
                 ? "Conforms"
                 : r.conformity === "does_not_conform"
                 ? "Does not conform"
@@ -159,7 +165,7 @@ function ReportCard({ r }: { r: VerifyResult }) {
         {r.issuer && <Row label="Issued by">{r.issuer}</Row>}
         {r.issuedAt && <Row label="Issued at">{r.issuedAt.slice(0, 16).replace("T", " ")} UTC</Row>}
         {r.approvedBy && <Row label="Approved by">{r.approvedBy}</Row>}
-        <Row label={`Integrity seal${r.sealAlgorithm ? ` (${r.sealAlgorithm})` : ""}`}>
+        {r.sealOk !== undefined && <Row label={`Integrity seal${r.sealAlgorithm ? ` (${r.sealAlgorithm})` : ""}`}>
           {r.sealOk ? (
             <span className="inline-flex items-center gap-1 text-emerald-600">
               <ShieldCheck className="w-3.5 h-3.5" /> Unchanged since issue
@@ -169,7 +175,7 @@ function ReportCard({ r }: { r: VerifyResult }) {
               <ShieldAlert className="w-3.5 h-3.5" /> {r.state === "unsealed" ? "Not sealed" : "Does not match"}
             </span>
           )}
-        </Row>
+        </Row>}
         <Row label="Signature">
           {signed ? (
             <span className="inline-flex items-center gap-1 text-emerald-600">

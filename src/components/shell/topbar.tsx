@@ -14,7 +14,11 @@ import { cn } from "@/lib/utils";
 import { useLiveNotifications } from "@/hooks/use-live-notifications";
 import { usePendingCount } from "@/lib/auto-translate";
 
+const UUID_SEG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function humanize(seg: string) {
+  // Record ids in the URL (/tests/<uuid>/report) are not page names.
+  if (UUID_SEG.test(seg)) return "Details";
   return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

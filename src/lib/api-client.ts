@@ -106,7 +106,9 @@ export async function apiDownload(path: string): Promise<{ blob: Blob; filename:
     throw new BackendError(res.status, json?.error?.code ?? "HTTP_" + res.status, json?.error?.message ?? `Download failed (${res.status})`);
   }
   const cd = res.headers.get("content-disposition") ?? "";
-  const filename = /filename="?([^";]+)"?/i.exec(cd)?.[1] ?? "download";
+  // RFC 5987 (filename*=UTF-8''name) first, then the plain form.
+  const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd)?.[1];
+  const filename = (star ? decodeURIComponent(star.trim()) : /filename="?([^";]+)"?/i.exec(cd)?.[1]) ?? "download";
   return { blob: await res.blob(), filename };
 }
 

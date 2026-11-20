@@ -171,7 +171,6 @@ table.civix tr:hover td {
   #civix-report-root {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    break-inside: avoid-page;
   }
   .card { box-shadow: none !important; }
 }
