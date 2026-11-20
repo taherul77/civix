@@ -34,6 +34,7 @@ import {
   HardHat,
 } from "lucide-react";
 import { useApp } from "@/store/app-store";
+import { useDashboardQuery } from "@/server/queries";
 import { t, useT, type DictKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { PAGE_BY_HREF } from "@/lib/page-catalog";
@@ -74,7 +75,7 @@ const groups: { title: string; items: NavItem[] }[] = [
         label: "Dashboard",
         icon: LayoutDashboard,
         children: [
-          { href: "/dashboard",       key: "dashboard",       icon: LayoutDashboard, badge: "9+", badgeTone: "rose" },
+          { href: "/dashboard",       key: "dashboard",       icon: LayoutDashboard },
           { href: "/admin-dashboard", key: "admin-dashboard", label: "Admin dashboard", icon: ShieldCheck },
         ],
       },
@@ -86,7 +87,7 @@ const groups: { title: string; items: NavItem[] }[] = [
           { href: "/projects",  key: "projects",  icon: FolderKanban },
           { href: "/samples",   key: "samples",   icon: Beaker },
           { href: "/tests",     key: "tests",     icon: TestTube2 },
-          { href: "/review",    key: "review",    label: "Review queue", icon: ClipboardCheck, badge: "3", badgeTone: "amber" },
+          { href: "/review",    key: "review",    label: "Review queue", icon: ClipboardCheck, badgeTone: "amber" },
         ],
       },
       {
@@ -225,6 +226,8 @@ export function Sidebar() {
   const hasPageAction = useApp((s) => s.hasPageAction);
   const pagePermissions = useApp((s) => s.pagePermissions);
   const tt = useT();
+  const { data: dash } = useDashboardQuery();
+  const pendingReview = dash?.pendingReview ?? 0;
   const collapsed = sidebarCollapsed;
 
   // Filter the entire menu by:
@@ -320,6 +323,8 @@ export function Sidebar() {
     const text = tt(baseLabel);
     const Icon = item.icon;
     const badgeTone = item.badgeTone ?? "rose";
+    // Live count for the review queue; no placeholder badges.
+    const badge = item.key === "review" && pendingReview > 0 ? String(pendingReview) : undefined;
     return (
       <Link
         key={item.href}
@@ -335,19 +340,19 @@ export function Sidebar() {
         {!collapsed && (
           <>
             <span className="sidebar-label flex-1 truncate">{text}</span>
-            {item.badge && (
+            {badge && (
               <span className={cn(
                 "sidebar-label inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[10px] font-bold",
                 badgeToneMap[badgeTone]
               )}>
-                {item.badge}
+                {badge}
               </span>
             )}
           </>
         )}
         {collapsed && (
           <>
-            {item.badge && (
+            {badge && (
               <span className={cn(
                 "absolute top-1 right-1 w-2 h-2 rounded-full ring-2 ring-[rgb(var(--sidebar))] dark:ring-[#0a1322]",
                 badgeTone === "rose" && "bg-rose-500",
@@ -355,7 +360,7 @@ export function Sidebar() {
                 badgeTone === "amber" && "bg-amber-500"
               )} />
             )}
-            <span className="tooltip">{text}{item.badge ? ` (${item.badge})` : ""}</span>
+            <span className="tooltip">{text}{item.badge ? ` (${badge})` : ""}</span>
           </>
         )}
       </Link>
