@@ -28,7 +28,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (hydrated && !user) router.replace("/login");
+    // Read the live store value, not the render-time `user`: on a hard reload
+    // the first (hydrating) render sees the server snapshot (user = null) even
+    // though the persisted session is already loaded, which used to bounce a
+    // signed-in user to /login.
+    if (hydrated && !useApp.getState().user) router.replace("/login");
   }, [hydrated, user, router]);
 
   if (!hydrated) return null;

@@ -115,7 +115,6 @@ export function Topbar() {
         <div className="relative">
           <button onClick={() => setOpen(open === "msg" ? null : "msg")} className="icon-btn" title={tt("Messages")}>
             <MessageSquare className="w-[18px] h-[18px]" />
-            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-cyan2-500 text-white text-[9px] font-bold grid place-items-center">3</span>
           </button>
           {open === "msg" && <MsgPanel onClose={() => setOpen(null)} />}
         </div>
@@ -197,7 +196,7 @@ function MsgPanel({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-1 bg-gradient-to-r from-cyan2-500/10 to-brand-500/10">
         <div>
           <div className="font-semibold text-sm">{tt("Messages")}</div>
-          <div className="text-[10px] text-[rgb(var(--muted))]">3 {tt("unread")}</div>
+          <div className="text-[10px] text-[rgb(var(--muted))]">{messages.length} {tt("messages")}</div>
         </div>
         <Inbox className="w-4 h-4 text-cyan2-500" />
       </div>

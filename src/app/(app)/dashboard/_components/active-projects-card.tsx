@@ -5,6 +5,8 @@ import { useT } from "@/lib/i18n";
 import { useLoc } from "@/lib/i18n-data";
 import { useApp } from "@/store/app-store";
 import { fmtAny } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FolderKanban } from "lucide-react";
 
 export function ActiveProjectsCard() {
   const tt = useT();
@@ -15,6 +17,9 @@ export function ActiveProjectsCard() {
   return (
     <div className="card p-5">
       <h3 className="font-semibold mb-3">{tt("Active projects")}</h3>
+      {projects.length === 0 && (
+        <EmptyState icon={FolderKanban} height={180} title={tt("No active projects")} hint={tt("Create a project to start tracking samples and tests.")} />
+      )}
       <ul className="space-y-3">
         {projects.map((p) => (
           <li key={p.id} className="text-sm">

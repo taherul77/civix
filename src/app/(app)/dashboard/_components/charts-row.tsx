@@ -1,73 +1,59 @@
 "use client";
 
+import { LineChart as LineIcon, PieChart as PieIcon, BarChart3 } from "lucide-react";
 import { MonthlyVolumeChart, CategoryPie, PassFailBar } from "@/components/dashboard/charts";
+import { EmptyState, ChartSkeleton } from "@/components/ui/empty-state";
+import { useDashboardQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
 
-const monthly = [
-  { month: "Nov", tests: 184, passed: 171 },
-  { month: "Dec", tests: 212, passed: 198 },
-  { month: "Jan", tests: 246, passed: 229 },
-  { month: "Feb", tests: 288, passed: 271 },
-  { month: "Mar", tests: 304, passed: 282 },
-  { month: "Apr", tests: 327, passed: 309 },
-];
-
-const byCategory = [
-  { name: "Concrete", value: 142 },
-  { name: "Soil", value: 78 },
-  { name: "Aggregate", value: 54 },
-  { name: "Asphalt", value: 31 },
-  { name: "Steel", value: 22 },
-  { name: "Cement", value: 17 },
-  { name: "Water", value: 28 },
-  { name: "Masonry", value: 9 },
-];
-
-const passFail = [
-  { category: "Concrete", pass: 132, fail: 10 },
-  { category: "Soil", pass: 74, fail: 4 },
-  { category: "Aggregate", pass: 51, fail: 3 },
-  { category: "Asphalt", pass: 29, fail: 2 },
-  { category: "Steel", pass: 22, fail: 0 },
-  { category: "Cement", pass: 16, fail: 1 },
-  { category: "Water", pass: 25, fail: 3 },
-];
-
+/** Live data from /v1/dashboard/stats; shows an empty state until a lab has tests. */
 export function MonthlyVolumeCard() {
   const tt = useT();
+  const { data, isLoading: loading } = useDashboardQuery();
+  const has = (data?.monthlyVolume ?? []).some((m) => m.tests > 0);
   return (
     <div className="card p-5 lg:col-span-2">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">{tt("Monthly test volume")}</h3>
         <span className="text-xs text-[rgb(var(--muted))]">{tt("Last 6 months")}</span>
       </div>
-      <MonthlyVolumeChart data={monthly} />
+      {loading && !data ? <ChartSkeleton /> : has
+        ? <MonthlyVolumeChart data={data!.monthlyVolume} />
+        : <EmptyState icon={LineIcon} title={tt("No tests recorded yet")} hint={tt("Monthly volume appears here once tests are submitted.")} />}
     </div>
   );
 }
 
 export function CategoryCard() {
   const tt = useT();
+  const { data, isLoading: loading } = useDashboardQuery();
+  const has = (data?.byCategory ?? []).length > 0;
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">{tt("By category")}</h3>
-        <span className="text-xs text-[rgb(var(--muted))]">{tt("This month")}</span>
+        <span className="text-xs text-[rgb(var(--muted))]">{tt("All time")}</span>
       </div>
-      <CategoryPie data={byCategory} />
+      {loading && !data ? <ChartSkeleton /> : has
+        ? <CategoryPie data={data!.byCategory} />
+        : <EmptyState icon={PieIcon} title={tt("Nothing to break down")} hint={tt("Tests will be grouped by category here.")} />}
     </div>
   );
 }
 
 export function PassFailCard() {
   const tt = useT();
+  const { data, isLoading: loading } = useDashboardQuery();
+  const has = (data?.passFailByCategory ?? []).some((c) => c.pass + c.fail > 0);
   return (
     <div className="card p-5 lg:col-span-2">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">{tt("Pass / fail by category")}</h3>
-        <span className="text-xs text-[rgb(var(--muted))]">{tt("Last 30 days")}</span>
+        <span className="text-xs text-[rgb(var(--muted))]">{tt("All time")}</span>
       </div>
-      <PassFailBar data={passFail} />
+      {loading && !data ? <ChartSkeleton /> : has
+        ? <PassFailBar data={data!.passFailByCategory} />
+        : <EmptyState icon={BarChart3} title={tt("No pass / fail results yet")} hint={tt("Results appear after tests are evaluated and submitted.")} />}
     </div>
   );
 }
