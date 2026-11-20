@@ -59,7 +59,6 @@ export function NewUserButton() {
   const [dept, setDept] = useState("");
   const [status, setStatus] = useState<User["status"]>("active");
   const [mfa, setMfa] = useState(true);
-  if (!canInvite) return null;
 
   const toggleRole = (r: string) => {
     setRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
@@ -96,6 +95,10 @@ export function NewUserButton() {
   useEffect(() => {
     if (!dept && DEPTS.length > 0) setDept(DEPTS[0]);
   }, [dept, DEPTS]);
+
+  // Must come after every hook: returning earlier changes the hook count
+  // between renders when permissions load and crashes the page.
+  if (!canInvite) return null;
 
   return (
     <>

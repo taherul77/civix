@@ -7,7 +7,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Users & roles"
-        description="11 RBAC roles with ISO 17025 audit trail."
+        description="Manage who can access your company and their roles, with an ISO 17025 audit trail."
         actions={<NewUserButton />}
       />
       <UsersTable />
