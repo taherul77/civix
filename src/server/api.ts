@@ -21,7 +21,7 @@
 import { useApp } from "@/store/app-store";
 import { useData } from "@/store/data-store";
 import { rolePermissions } from "@/lib/rbac";
-import { apiFetch, isBackendActive } from "@/lib/api-client";
+import { apiDownload, apiFetch, isBackendActive } from "@/lib/api-client";
 import {
   projectFromApi,
   sampleFromApi,
@@ -1085,44 +1085,34 @@ export const dashboard = {
 // Reports (spec §7)
 // ---------------------------------------------------------------------------
 
-const reportNumberFor = (testCode: string) =>
-  `RPT-${new Date().getFullYear()}-${testCode.split("-").pop()}`;
+export interface ReportStatus {
+  reportNumber: string | null;
+  reportId: string | null;
+  /** not_issued | issued | stale (the test changed after the report was issued) */
+  reportStatus: "not_issued" | "issued" | "stale";
+}
 
 export const reports = {
-  /** Hydrate everything a report page needs: test + relations + signature trail. */
-  async get(testId: string): Promise<ReportContext | null> {
+  /** Current report of a test, from the backend (the number is allocated server-side). */
+  async status(testId: string): Promise<ReportStatus> {
     await tick();
-    requireAuth();
-    const s = useData.getState();
-    const test = s.tests.find((t) => t.id === testId);
-    if (!test) return null;
-    const sample = s.samples.find((x) => x.id === test.sampleId) ?? null;
-    const project = s.projects.find((x) => x.id === test.projectId) ?? null;
-    const trail = s.audit.filter((a) => a.entity === "test" && a.entityId === test.id);
-    const reviewEvt = trail.find((a) => a.action === "review");
-    const apvEvt = trail.find((a) => a.action === "approve");
-    const signEvt = trail.find((a) => a.action === "sign");
-    const sigSerial = signEvt?.diff?.find((d) => d.field === "signature")?.to ?? null;
+    requireBackend();
+    const out = await apiFetch<ReportStatus>(`/v1/reports/test/${testId}`);
+    return { reportNumber: out.reportNumber, reportId: out.reportId, reportStatus: out.reportStatus };
+  },
 
-    return {
-      test,
-      sample,
-      project,
-      reportNumber: reportNumberFor(test.code),
-      generatedAt: trail.find((a) => a.action === "approve" || a.action === "sign")?.ts ?? null,
-      signedBy: signEvt?.user ?? null,
-      signatureSerial: sigSerial,
-      reviewedBy: reviewEvt?.user ?? null,
-      reviewedAt: reviewEvt?.ts ?? null,
-      approvedBy: apvEvt?.user ?? null,
-      approvedAt: apvEvt?.ts ?? null,
-      conformity:
-        test.passFail === "pass"
-          ? "conforms"
-          : test.passFail === "fail"
-          ? "does_not_conform"
-          : "pending",
-    };
+  /** Issue a report for an approved test (allocates the number, seals the content). Idempotent while unchanged. */
+  async issue(testId: string): Promise<{ reportId: string; reportNumber: string; reused: boolean }> {
+    await tick();
+    requireBackend();
+    return apiFetch(`/v1/reports/test/${testId}/issue`, { method: "POST", body: {} });
+  },
+
+  /** Download the server-generated PDF of an issued report. */
+  async downloadPdf(reportId: string): Promise<{ blob: Blob; filename: string }> {
+    await tick();
+    requireBackend();
+    return apiDownload(`/v1/reports/${reportId}/pdf`);
   },
 
   /** Public verification endpoint — used by the QR target route /verify/<id>. */
@@ -1134,17 +1124,6 @@ export const reports = {
     return await apiFetch<VerifyResult>(`/v1/reports/verify/${encodeURIComponent(testIdOrReportNumber)}`, {
       noAuth: true,
     });
-  },
-
-  /** Record that a report was generated (PDF/Word/Excel) — spec §7 audit. */
-  async markGenerated(input: ReportGenerateInput): Promise<{ reportNumber: string }> {
-    await tick();
-    requireBackend();
-    const out = await apiFetch<{ reportNumber: string; reportId: string }>(
-      `/v1/reports/test/${input.testId}/generated`,
-      { method: "POST", body: { format: input.format } }
-    );
-    return { reportNumber: out.reportNumber };
   },
 };
 

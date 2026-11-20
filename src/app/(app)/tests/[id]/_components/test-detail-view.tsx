@@ -18,14 +18,18 @@ export function TestDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: test } = useTestQuery(id);
+  const { data: test, isLoading: testLoading } = useTestQuery(id);
   const { data: sample } = useSampleQuery(test?.sampleId);
   const { data: project } = useProjectQuery(test?.projectId);
   const { data: audit = [] } = useAuditQuery();
 
   const canSubmit = useCan("test:submit");
 
-  if (!test) notFound();
+  // 404 only after the lookup finished; at first render `test` is still undefined.
+  if (!test) {
+    if (testLoading) return <div className="card p-10 text-center text-sm text-[rgb(var(--muted))]">{tt("Loading…")}</div>;
+    notFound();
+  }
   const testAudit = audit.filter((a) => a.entity === "test" && a.entityId === test.id);
   const lastByAction = (action: string) => testAudit.find((a) => a.action === action);
   const submitEvt   = lastByAction("submit");

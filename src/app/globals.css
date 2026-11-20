@@ -161,3 +161,16 @@ table.civix tr:hover td {
 .sidebar-collapsed .sidebar-profile-card {
   display: none;
 }
+
+/* ---- Printing ---------------------------------------------------------
+   Print only the page content (reports): no app shell, white paper, and keep
+   brand colours (browsers drop backgrounds unless told otherwise). */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; height: auto !important; }
+  #civix-report-root {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .card { box-shadow: none !important; }
+}

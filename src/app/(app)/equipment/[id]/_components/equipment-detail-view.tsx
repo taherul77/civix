@@ -17,10 +17,13 @@ export function EquipmentDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: equipment = [] } = useEquipmentQuery();
+  const { data: equipment = [], isLoading: equipmentLoading } = useEquipmentQuery();
   const eq = equipment.find((e) => e.id === id);
 
-  if (!eq) notFound();
+  if (!eq) {
+    if (equipmentLoading) return <div className="card p-10 text-center text-sm text-[rgb(var(--muted))]">{tt("Loading…")}</div>;
+    notFound();
+  }
 
   const days = Math.round((new Date(eq.calibrationDue).getTime() - Date.now()) / 86400000);
   const calIcon = days < 0 ? AlertTriangle : days < 30 ? AlertTriangle : CheckCircle2;

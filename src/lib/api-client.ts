@@ -93,6 +93,25 @@ export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T
   return json as T;
 }
 
+/** Authenticated binary download (e.g. report PDFs). Throws BackendError like apiFetch. */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = useApp.getState().apiToken;
+  const res = await fetch(buildUrl(path), {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const json = safeJson(await res.text()) as { error?: { code?: string; message?: string } } | null;
+    if (res.status === 401 && !path.startsWith("/v1/auth/")) handleAuthExpired();
+    throw new BackendError(res.status, json?.error?.code ?? "HTTP_" + res.status, json?.error?.message ?? `Download failed (${res.status})`);
+  }
+  const cd = res.headers.get("content-disposition") ?? "";
+  // RFC 5987 (filename*=UTF-8''name) first, then the plain form.
+  const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd)?.[1];
+  const filename = (star ? decodeURIComponent(star.trim()) : /filename="?([^";]+)"?/i.exec(cd)?.[1]) ?? "download";
+  return { blob: await res.blob(), filename };
+}
+
 /** Module-scoped guard so a burst of parallel 401s only signs out once. */
 let signingOut = false;
 function handleAuthExpired(): void {

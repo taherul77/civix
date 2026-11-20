@@ -14,7 +14,11 @@ import { cn } from "@/lib/utils";
 import { useLiveNotifications } from "@/hooks/use-live-notifications";
 import { usePendingCount } from "@/lib/auto-translate";
 
+const UUID_SEG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function humanize(seg: string) {
+  // Record ids in the URL (/tests/<uuid>/report) are not page names.
+  if (UUID_SEG.test(seg)) return "Details";
   return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -60,7 +64,7 @@ export function Topbar() {
   return (
     <header
       ref={ref}
-      className="sticky top-0 z-30 h-[72px] border-b border-[rgb(var(--border))] bg-[rgb(var(--topbar))]/85 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-3"
+      className="print:hidden sticky top-0 z-30 h-[72px] border-b border-[rgb(var(--border))] bg-[rgb(var(--topbar))]/85 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-3"
     >
       {/* Hamburger — sits where sidebar ends */}
       <button

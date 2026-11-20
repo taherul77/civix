@@ -5,44 +5,44 @@ import { useState } from "react";
 import { ArrowLeft, Download, Printer, Loader2 } from "lucide-react";
 import { api } from "@/server/api";
 import { mutate } from "@/server/mutate";
-import { downloadReportPdf } from "@/lib/pdf-report";
-import { useApp } from "@/store/app-store";
+import { invalidate } from "@/server/invalidation";
+import { useReportStatusQuery } from "@/server/queries";
 import { toast } from "@/components/ui/toast";
 
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 export function ReportToolbar({ testId }: { testId: string }) {
-  const tenant = useApp((s) => s.user?.tenant ?? "CiviXLab");
+  const { data: status } = useReportStatusQuery(testId);
   const [generating, setGenerating] = useState(false);
+
+  const issued = status?.reportStatus === "issued";
+  const label = generating ? "Generating…" : issued ? "Download PDF" : status?.reportStatus === "stale" ? "Re-issue & download PDF" : "Issue & download PDF";
 
   const onDownload = async () => {
     setGenerating(true);
     try {
-      const ctx = await api.reports.get(testId);
-      if (!ctx) {
-        toast.error("Report data unavailable");
-        return;
+      let reportId = issued ? status?.reportId ?? null : null;
+      if (!reportId) {
+        // The server allocates the unique report number and seals the content.
+        // Only approved tests can be issued (the API answers 409 otherwise).
+        const result = await mutate(() => api.reports.issue(testId), "Report issued");
+        if (!result) return;
+        reportId = result.reportId;
+        invalidate("report-status");
       }
-      // Audit + permission gate happen here. If denied, the helper toasts and
-      // returns null without producing a PDF.
-      const stamped = await mutate(
-        () => api.reports.markGenerated({ testId, format: "pdf" }),
-        "Report PDF generated"
-      );
-      if (!stamped) return;
-
-      const root = document.getElementById("civix-report-root") as HTMLElement | null;
-      if (!root) {
-        toast.error("Report DOM not ready — try again");
-        return;
-      }
-      await downloadReportPdf(root, {
-        reportNumber: stamped.reportNumber,
-        testName: typeof ctx.test.name === "string" ? ctx.test.name : (ctx.test.name?.en ?? ctx.test.code),
-        testCode: ctx.test.code,
-        standard: ctx.test.standard,
-        tenant,
-        signedBy: ctx.signedBy ?? undefined,
-        signatureSerial: ctx.signatureSerial ?? undefined,
-      });
+      const { blob, filename } = await api.reports.downloadPdf(reportId);
+      saveBlob(blob, filename);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not download the report");
     } finally {
       setGenerating(false);
     }
@@ -62,7 +62,7 @@ export function ReportToolbar({ testId }: { testId: string }) {
         </button>
         <button onClick={onDownload} disabled={generating} className="btn btn-primary">
           {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {generating ? "Generating…" : "Download PDF"}
+          {label}
         </button>
       </div>
     </div>

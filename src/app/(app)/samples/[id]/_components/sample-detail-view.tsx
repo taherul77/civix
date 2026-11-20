@@ -27,11 +27,14 @@ export function SampleDetailView({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: sample } = useSampleQuery(id);
+  const { data: sample, isLoading: sampleLoading } = useSampleQuery(id);
   const { data: project } = useProjectQuery(sample?.projectId);
   const { data: sampleTests = [] } = useTestsQuery({ sampleId: id });
 
-  if (!sample) notFound();
+  if (!sample) {
+    if (sampleLoading) return <div className="card p-10 text-center text-sm text-[rgb(var(--muted))]">{tt("Loading…")}</div>;
+    notFound();
+  }
 
   return (
     <div className="space-y-6">

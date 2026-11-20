@@ -4,14 +4,11 @@ import { notFound } from "next/navigation";
 import { ShieldCheck, FileCheck } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { QrCode } from "@/components/ui/qr-code";
-import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery } from "@/server/queries";
+import { useTestQuery, useSampleQuery, useProjectQuery, useAuditQuery, useReportStatusQuery } from "@/server/queries";
 import { useLoc } from "@/lib/i18n-data";
 import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app-store";
 import { fmtAny } from "@/lib/utils";
-
-const reportNumberFor = (testCode: string) =>
-  `RPT-${new Date().getFullYear()}-${testCode.split("-").pop()}`;
 
 const verifyOrigin = () =>
   typeof window !== "undefined" ? window.location.origin : "https://civixlab.sa";
@@ -20,14 +17,24 @@ export function ReportDocument({ id }: { id: string }) {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: test } = useTestQuery(id);
+  const { data: test, isLoading: testLoading, error: testError } = useTestQuery(id);
   const { data: sample } = useSampleQuery(test?.sampleId);
   const { data: project } = useProjectQuery(test?.projectId);
   const { data: audit = [] } = useAuditQuery();
+  const { data: reportStatus } = useReportStatusQuery(id);
 
-  if (!test) notFound();
-  const reportNumber = reportNumberFor(test.code);
-  const verifyUrl = `${verifyOrigin()}/verify/${reportNumber}`;
+  // Only 404 once the lookup has finished: during the first render `test` is
+  // still undefined, and calling notFound() then broke direct links and reloads.
+  if (!test) {
+    if (testLoading) return <div className="card p-10 text-center text-sm text-[rgb(var(--muted))]">{tt("Loading report…")}</div>;
+    if (testError) return <div className="card p-10 text-center text-sm text-rose-600">{tt("Could not load the report:")} {testError.message}</div>;
+    notFound();
+  }
+  // The number is allocated by the server when the report is issued; until then there is none.
+  // A stale report (test changed after issue) is not shown as current: it must be re-issued.
+  const stale = reportStatus?.reportStatus === "stale";
+  const reportNumber = reportStatus?.reportStatus === "issued" ? reportStatus.reportNumber : null;
+  const verifyUrl = reportNumber ? `${verifyOrigin()}/verify/${reportNumber}` : null;
 
   const trail = audit.filter((a) => a.entity === "test" && a.entityId === test.id);
   const reviewEvt = trail.find((a) => a.action === "review");
@@ -39,8 +46,8 @@ export function ReportDocument({ id }: { id: string }) {
     <>
       <div
         id="civix-report-root"
-        data-report-number={reportNumber}
-        className="bg-white text-slate-900 mx-auto max-w-4xl p-10 shadow-sm border border-slate-200 rounded-lg print:shadow-none print:border-0 print:rounded-none print:p-0"
+        data-report-number={reportNumber ?? ""}
+        className="bg-white text-slate-900 mx-auto max-w-4xl min-w-[640px] print:min-w-0 p-5 sm:p-10 shadow-sm border border-slate-200 rounded-lg print:shadow-none print:border-0 print:rounded-none print:p-0 print:pr-2"
       >
         <header className="border-b-2 border-brand-700 pb-4 mb-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -52,9 +59,9 @@ export function ReportDocument({ id }: { id: string }) {
               <div className="text-xs text-slate-500">ISO 17025:2017 • SAAC-Accredited</div>
             </div>
           </div>
-          <div className="text-right text-xs">
+          <div className="text-right text-xs shrink-0 pl-4">
             <div className="font-bold text-base text-slate-900">TEST REPORT</div>
-            <div className="font-mono mt-1">{reportNumber}</div>
+            <div className="font-mono mt-1">{reportNumber ?? (stale ? "Changed since issue: re-issue" : "Not yet issued")}</div>
             <div className="text-slate-500 mt-1">Issue: {test.testDate} • Rev. 0</div>
           </div>
         </header>
@@ -196,12 +203,14 @@ export function ReportDocument({ id }: { id: string }) {
               {sigSerial
                 ? <>Digitally signed · cert SN {sigSerial} · </>
                 : <>Unsigned draft · </>}
-              Verifiable at {verifyUrl}
+              {verifyUrl ? <>Verifiable at {verifyUrl}</> : <>Draft preview, issue the report to get a verification code</>}
             </div>
           </div>
           <div className="flex justify-end">
             <div className="p-1.5 rounded bg-slate-100">
-              <QrCode value={verifyUrl} size={96} />
+              {verifyUrl
+                ? <QrCode value={verifyUrl} size={96} />
+                : <div className="w-24 h-24 grid place-items-center text-[10px] text-center text-slate-400">QR appears once issued</div>}
             </div>
           </div>
         </footer>

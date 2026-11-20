@@ -76,17 +76,60 @@ function NotFoundCard({ reportNumber }: { reportNumber: string }) {
   );
 }
 
+const STATE_BANNER: Record<NonNullable<VerifyResult["state"]>, { tone: string; title: string; body: string; Icon: typeof ShieldCheck }> = {
+  valid: {
+    tone: "border-emerald-500/60 bg-emerald-50/50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200",
+    title: "Genuine report",
+    body: "Issued by the laboratory below. The test content and results are unchanged since issue.",
+    Icon: ShieldCheck,
+  },
+  superseded: {
+    tone: "border-amber-500/60 bg-amber-50/60 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200",
+    title: "Superseded report",
+    body: "The laboratory has issued a newer report for this test. Ask them for the current one before relying on this.",
+    Icon: ShieldAlert,
+  },
+  modified: {
+    tone: "border-rose-500/60 bg-rose-50/60 text-rose-800 dark:bg-rose-950/30 dark:text-rose-200",
+    title: "Content changed after issue: do not rely on this report",
+    body: "The test data no longer matches what was sealed when the report was issued.",
+    Icon: ShieldAlert,
+  },
+  unsealed: {
+    tone: "border-amber-500/60 bg-amber-50/60 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200",
+    title: "Unsealed draft",
+    body: "This report has no integrity seal, so its content cannot be confirmed.",
+    Icon: ShieldAlert,
+  },
+};
+
 function ReportCard({ r }: { r: VerifyResult }) {
-  const conformOk = r.conformity === "conforms";
+  // Only a "valid" report (or an older backend that sends no state) is trusted. For
+  // modified/superseded/unsealed reports the recorded result is shown as unverified,
+  // never with the green "PASS" styling.
+  const trusted = !r.state || r.state === "valid";
+  const conformOk = trusted && r.conformity === "conforms";
+  const failed = trusted && r.conformity === "does_not_conform";
   const signed = !!r.signatureSerial;
+  const banner = r.state ? STATE_BANNER[r.state] : null;
   return (
     <>
+      {banner && (
+        <div className={cn("card p-4 border-2 flex items-start gap-3", banner.tone)}>
+          <banner.Icon className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold">{banner.title}</div>
+            <div className="text-sm opacity-90 mt-0.5">{banner.body}</div>
+          </div>
+        </div>
+      )}
+
       <div
         className={cn(
           "card p-6 border-2",
           conformOk
             ? "border-emerald-500/60 bg-emerald-50/40 dark:bg-emerald-950/20"
-            : r.conformity === "does_not_conform"
+            : failed
             ? "border-rose-500/60 bg-rose-50/40 dark:bg-rose-950/20"
             : "border-slate-300 dark:border-slate-800"
         )}
@@ -94,7 +137,7 @@ function ReportCard({ r }: { r: VerifyResult }) {
         <div className="flex items-start gap-3">
           {conformOk ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 mt-0.5" />
-          ) : r.conformity === "does_not_conform" ? (
+          ) : failed ? (
             <XCircle className="w-7 h-7 text-rose-600 shrink-0 mt-0.5" />
           ) : (
             <ShieldAlert className="w-7 h-7 text-slate-500 shrink-0 mt-0.5" />
@@ -104,7 +147,8 @@ function ReportCard({ r }: { r: VerifyResult }) {
               {r.reportNumber}
             </div>
             <div className="font-bold text-xl mt-1">
-              {conformOk
+              {!trusted && "Recorded result (unverified): "}
+              {r.conformity === "conforms"
                 ? "Conforms"
                 : r.conformity === "does_not_conform"
                 ? "Does not conform"
@@ -118,6 +162,20 @@ function ReportCard({ r }: { r: VerifyResult }) {
       </div>
 
       <div className="card p-5 space-y-3 text-sm">
+        {r.issuer && <Row label="Issued by">{r.issuer}</Row>}
+        {r.issuedAt && <Row label="Issued at">{r.issuedAt.slice(0, 16).replace("T", " ")} UTC</Row>}
+        {r.approvedBy && <Row label="Approved by">{r.approvedBy}</Row>}
+        {r.sealOk !== undefined && <Row label={`Integrity seal${r.sealAlgorithm ? ` (${r.sealAlgorithm})` : ""}`}>
+          {r.sealOk ? (
+            <span className="inline-flex items-center gap-1 text-emerald-600">
+              <ShieldCheck className="w-3.5 h-3.5" /> Unchanged since issue
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-rose-600">
+              <ShieldAlert className="w-3.5 h-3.5" /> {r.state === "unsealed" ? "Not sealed" : "Does not match"}
+            </span>
+          )}
+        </Row>}
         <Row label="Signature">
           {signed ? (
             <span className="inline-flex items-center gap-1 text-emerald-600">
@@ -149,8 +207,9 @@ function ReportCard({ r }: { r: VerifyResult }) {
 
       <p className="text-xs text-[rgb(var(--muted))] text-center">
         This page is the public verification endpoint targeted by the QR code on the report PDF.
-        It returns a PASS only if the report has been digitally signed, the recorded conformity
-        result is &quot;Conforms&quot;, and the lab&apos;s audit chain is intact.
+        Rely on a report only when it shows &quot;Genuine report&quot; and the audit chain is intact.
+        The seal is a SHA-256 integrity check of the test inputs, results and approval; it is not a
+        certificate-based digital signature.
       </p>
     </>
   );

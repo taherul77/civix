@@ -159,6 +159,14 @@ export interface ReportContext {
 export interface VerifyResult {
   reportNumber: string;
   found: boolean;
+  /** valid | superseded | modified | unsealed */
+  state?: "valid" | "superseded" | "modified" | "unsealed";
+  issuer?: string;
+  issuedAt?: string;
+  sealAlgorithm?: string | null;
+  /** Test content and frozen results unchanged since the report was issued. */
+  sealOk?: boolean;
+  approvedBy?: string | null;
   testCode?: string;
   standard?: string;
   conformity?: "conforms" | "does_not_conform" | "pending";
