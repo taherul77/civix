@@ -4,11 +4,13 @@ import { Building2, KeyRound, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
+// SSO is on the roadmap (enterprise tier) but not implemented yet, so every
+// provider is listed as "coming soon" instead of showing made-up user counts.
 const samlProviders = [
-  { id: "azure",  name: "Azure AD",         status: "configured", users: 41, color: "from-sky-600 to-blue-700" },
-  { id: "okta",   name: "Okta",             status: "available",  users: 0,  color: "from-blue-600 to-indigo-700" },
-  { id: "google", name: "Google Workspace", status: "configured", users: 18, color: "from-red-500 to-amber-500" },
-  { id: "ms365",  name: "Microsoft 365",    status: "available",  users: 0,  color: "from-cyan-600 to-sky-700" },
+  { id: "azure",  name: "Azure AD",         color: "from-sky-600 to-blue-700" },
+  { id: "okta",   name: "Okta",             color: "from-blue-600 to-indigo-700" },
+  { id: "google", name: "Google Workspace", color: "from-red-500 to-amber-500" },
+  { id: "ms365",  name: "Microsoft 365",    color: "from-cyan-600 to-sky-700" },
 ];
 
 export function SsoProvidersCard() {
@@ -17,7 +19,7 @@ export function SsoProvidersCard() {
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold flex items-center gap-2"><Building2 className="w-4 h-4" /> {tt("SAML 2.0 SSO")}</h3>
-        <button className="btn btn-outline px-3"><Plus className="w-4 h-4" /> {tt("Add")}</button>
+        <button className="btn btn-outline px-3" disabled title={tt("Coming soon")}><Plus className="w-4 h-4" /> {tt("Add")}</button>
       </div>
       <div className="space-y-3">
         {samlProviders.map((p) => (
@@ -28,10 +30,10 @@ export function SsoProvidersCard() {
             <div className="flex-1">
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-[rgb(var(--muted))]">
-                {p.status === "configured" ? `${p.users} users via SSO` : "Not configured"}
+                {tt("Not configured")}
               </div>
             </div>
-            <span className={`badge ${p.status === "configured" ? "badge-pass" : "badge-muted"}`}>{p.status}</span>
+            <span className="badge badge-muted">{tt("Coming soon")}</span>
           </div>
         ))}
       </div>

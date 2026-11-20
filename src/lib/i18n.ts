@@ -179,7 +179,7 @@ const ar: Record<string, string> = {
   "Choose from the curated catalog of 75 tests for the Middle East.": "اختر من كتالوج 75 اختبارًا مخصصة للشرق الأوسط.",
   "Generated reports with digital signatures and verification QR codes.": "التقارير الصادرة مع التواقيع الرقمية ورموز التحقق.",
   "Equipment register, calibration tracking, and integration endpoints.": "سجل المعدات وتتبع المعايرة ونقاط التكامل.",
-  "11 RBAC roles with ISO 17025 audit trail.": "11 دور صلاحيات مع سجل تدقيق ISO 17025.",
+  "Manage who can access your company and their roles, with an ISO 17025 audit trail.": "إدارة من يمكنه الوصول إلى شركتك وأدوارهم، مع سجل تدقيق ISO 17025.",
   "Users & roles": "المستخدمون والأدوار",
   "Tenant, preferences, security and integrations.": "المستأجر والتفضيلات والأمن والتكاملات.",
   "ISO 17025 §8.4 immutable audit trail. 7-year retention.": "سجل تدقيق ISO 17025 §8.4 غير قابل للتعديل. الاحتفاظ لمدة 7 سنوات.",

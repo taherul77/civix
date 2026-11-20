@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FileText, Download } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useTestsQuery } from "@/server/queries";
 import { useT } from "@/lib/i18n";
@@ -13,7 +14,18 @@ export function ReportsGrid() {
   const tt = useT();
   const loc = useLoc();
   const lang = useApp((s) => s.lang);
-  const { data: tests = [] } = useTestsQuery();
+  const { data: tests = [], isLoading } = useTestsQuery();
+
+  if (!isLoading && tests.length === 0) {
+    return (
+      <EmptyState
+        icon={FileText}
+        height={260}
+        title={tt("No reports yet")}
+        hint={tt("A report is generated for each test. Submit a test to see it here.")}
+      />
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
