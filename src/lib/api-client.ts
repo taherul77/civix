@@ -112,3 +112,36 @@ function handleAuthExpired(): void {
 function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return null; }
 }
+
+// ---------------------------------------------------------------------------
+// Test engine (server-authoritative calculation + pass/fail)
+// ---------------------------------------------------------------------------
+
+export interface EngineCheck {
+  id: string;
+  label: string;
+  measured: number | string;
+  limit: string;
+  unit?: string;
+  status: "pass" | "fail" | "warning" | "info";
+  critical?: boolean;
+  message?: string;
+}
+
+export interface EngineEvaluation {
+  testCode: string;
+  results: Record<string, number | string | boolean>;
+  rows?: { key: string; label: string; unit?: string; value: number | string }[];
+  checks: EngineCheck[];
+  warnings: string[];
+  overall: "pass" | "fail" | "warning" | "pending";
+}
+
+/** Ask the backend engine to calculate and judge a test. Empty inputs are dropped. */
+export function evaluateTest(code: string, values: Record<string, number | string>): Promise<EngineEvaluation> {
+  const body = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ""));
+  return apiFetch<EngineEvaluation>(`/v1/operations/test-templates/${encodeURIComponent(code)}/evaluate`, {
+    method: "POST",
+    body,
+  });
+}

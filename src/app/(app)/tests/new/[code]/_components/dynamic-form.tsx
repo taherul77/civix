@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Save, Send } from "lucide-react";
@@ -12,6 +12,7 @@ import { TestContextBar, makeDefaultContext, type TestContext } from "@/componen
 import { schemas } from "@/lib/test-schemas";
 import { categoryMeta } from "@/lib/test-catalog";
 import { submitTest } from "@/lib/test-submit";
+import { evaluateTest, isBackendActive, type EngineEvaluation } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 export function DynamicTestForm({ code }: { code: string }) {
@@ -38,9 +39,30 @@ export function DynamicTestForm({ code }: { code: string }) {
     return { ...r, raw, display };
   }), [schema, values]);
 
-  const passes = schema.passRules.map((r) => ({ label: r.label, ok: r.ok(values) }));
-  const overall: "pass" | "fail" | "pending" =
-    passes.length === 0 ? "pending" : passes.every((p) => p.ok) ? "pass" : "fail";
+  // Server-authoritative evaluation. When signed in against the backend, the
+  // engine's verdict replaces the local one (local math stays as instant/offline preview).
+  const [server, setServer] = useState<EngineEvaluation | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isBackendActive()) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      evaluateTest(schema.code, values)
+        .then((r) => { if (!cancelled) { setServer(r); setServerError(null); } })
+        .catch((e: Error) => { if (!cancelled) { setServer(null); setServerError(e.message); } });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [schema.code, values]);
+
+  const localPasses = schema.passRules.map((r) => ({ label: r.label, ok: r.ok(values) }));
+  const passes = server
+    ? server.checks.filter((c) => c.status !== "info").map((c) => ({ label: c.label, ok: c.status !== "fail" }))
+    : localPasses;
+  const localOverall: "pass" | "fail" | "pending" =
+    localPasses.length === 0 ? "pending" : localPasses.every((p) => p.ok) ? "pass" : "fail";
+  const overall: "pass" | "fail" | "pending" = server
+    ? (server.overall === "warning" ? "pass" : server.overall)
+    : localOverall;
   const meta = categoryMeta[schema.category];
 
   const primary = computedResults.find((r) => typeof r.raw === "number");
@@ -148,6 +170,17 @@ export function DynamicTestForm({ code }: { code: string }) {
               <h3 className="font-semibold">Live results</h3>
               <StatusBadge value={overall} />
             </div>
+            {server && (
+              <p className="-mt-2 mb-3 text-[11px] text-emerald-600 inline-flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" /> Verified by server
+              </p>
+            )}
+            {serverError && (
+              <p className="-mt-2 mb-3 text-[11px] text-amber-600">Server check unavailable: {serverError}. Showing local preview.</p>
+            )}
+            {server?.warnings.map((w) => (
+              <p key={w} className="mb-2 text-xs text-amber-600">⚠ {w}</p>
+            ))}
 
             <div className="space-y-3">
               {computedResults.map((r) => (
