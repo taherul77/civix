@@ -1107,6 +1107,7 @@ export const dashboard = {
     }
     const raw = await apiFetch<{
       testsToday: number; pendingReview: number; approvedThisMonth: number; overdueCalibrations: number;
+      usage?: { testsThisMonth: number; maxTestsPerMonth: number };
       monthlyVolume: { month: string; tests: number; passed: number }[];
       byCategory: { name: string; value: number }[];
       passFailByCategory: { category: string; pass: number; fail: number }[];
@@ -1118,6 +1119,7 @@ export const dashboard = {
       pendingReview: raw.pendingReview,
       approvedThisMonth: raw.approvedThisMonth,
       overdueCalibrations: raw.overdueCalibrations,
+      usage: raw.usage,
       monthlyVolume: raw.monthlyVolume,
       byCategory: raw.byCategory,
       passFailByCategory: raw.passFailByCategory,

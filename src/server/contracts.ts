@@ -193,6 +193,8 @@ export interface DashboardStats {
   pendingReview: number;
   approvedThisMonth: number;
   overdueCalibrations: number;
+  /** Plan usage for the current UTC month (absent on older backends). */
+  usage?: { testsThisMonth: number; maxTestsPerMonth: number };
   monthlyVolume: { month: string; tests: number; passed: number }[];
   byCategory: { name: string; value: number }[];
   passFailByCategory: { category: string; pass: number; fail: number }[];
