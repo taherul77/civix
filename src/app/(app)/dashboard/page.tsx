@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
-import { DashboardKpiRow } from "./_components/kpi-row";
+import { DashboardKpiRow, UsageCard } from "./_components/kpi-row";
 import { MonthlyVolumeCard, CategoryCard, PassFailCard } from "./_components/charts-row";
 import { ActiveProjectsCard } from "./_components/active-projects-card";
 import { RecentTestsCard } from "./_components/recent-tests-card";
@@ -13,6 +13,7 @@ export default function DashboardPage() {
       />
 
       <DashboardKpiRow />
+      <UsageCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <MonthlyVolumeCard />
