@@ -28,7 +28,7 @@ export function UsageCard() {
   const tt = useT();
   const { data } = useDashboardQuery();
   const u = data?.usage;
-  if (!u || u.maxTestsPerMonth <= 0) return null;
+  if (!u || !Number.isFinite(u.testsThisMonth) || !Number.isFinite(u.maxTestsPerMonth) || u.maxTestsPerMonth <= 0) return null;
   const pct = Math.min(100, Math.round((u.testsThisMonth / u.maxTestsPerMonth) * 100));
   const full = u.testsThisMonth >= u.maxTestsPerMonth;
   const near = !full && pct >= 80;
@@ -36,7 +36,7 @@ export function UsageCard() {
   return (
     <div className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="text-xs uppercase tracking-wider text-[rgb(var(--muted))] font-semibold">{tt("Tests this month")}</div>
+        <div className="text-xs uppercase tracking-wider text-[rgb(var(--muted))] font-semibold">{tt("Tests this month")} <span className="normal-case font-normal">(UTC)</span></div>
         <div className="text-sm font-semibold">{u.testsThisMonth} / {u.maxTestsPerMonth}</div>
       </div>
       <div className="mt-2 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden" role="progressbar"
