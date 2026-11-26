@@ -22,6 +22,25 @@ function humanize(seg: string) {
   return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** "Tests" → "Test"; "Equipment" and "Master Setup" stay as they are. */
+function singular(label: string) {
+  if (/ies$/i.test(label)) return label.replace(/ies$/i, "y");
+  if (/(ss|us|ment)$/i.test(label)) return label;
+  return label.replace(/s$/i, "");
+}
+
+/** Top-bar title. Record pages name the record type instead of a bare "Details". */
+function pageTitleOf(segments: string[]): string {
+  if (segments.length === 0) return "Dashboard";
+  const last = segments[segments.length - 1];
+  const idIdx = segments.findIndex((x) => UUID_SEG.test(x));
+  if (idIdx > 0) {
+    const kind = singular(humanize(segments[idIdx - 1]));
+    return idIdx === segments.length - 1 ? `${kind} Details` : `${kind} ${humanize(last)}`;
+  }
+  return humanize(last);
+}
+
 const apps = [
   { name: "Tests",     href: "/tests",     icon: TestTube2,     tone: "from-teal-500 to-indigo-500" },
   { name: "Samples",   href: "/samples",   icon: Beaker,        tone: "from-cyan-500 to-blue-600" },
@@ -29,12 +48,6 @@ const apps = [
   { name: "Reports",   href: "/reports",   icon: FileBarChart2, tone: "from-emerald-500 to-teal-600" },
   { name: "Equipment", href: "/equipment", icon: FlaskConical,  tone: "from-sky-500 to-cyan-600" },
   { name: "Audit",     href: "/audit",     icon: ShieldCheck,   tone: "from-indigo-500 to-blue-600" },
-];
-
-const messages = [
-  { id: "m1", from: "Eng. Khalid Al-Otaibi", body: "PC-14 results approved — please release report.", ts: "5 min" },
-  { id: "m2", from: "Sarah Mansour", body: "BH-08 tests ready for your review.", ts: "1 h" },
-  { id: "m3", from: "Quality team", body: "Weekly compliance summary attached.", ts: "3 h" },
 ];
 
 export function Topbar() {
@@ -49,7 +62,7 @@ export function Topbar() {
   const segments = pathname.split("/").filter(Boolean);
   const notifications = useLiveNotifications();
   const unread = notifications.filter((n) => !n.read).length;
-  const pageTitle = tt(segments.length === 0 ? "Dashboard" : humanize(segments[segments.length - 1]));
+  const pageTitle = tt(pageTitleOf(segments));
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -121,7 +134,7 @@ export function Topbar() {
           <button onClick={() => setOpen(open === "msg" ? null : "msg")} className="icon-btn" title={tt("Messages")}>
             <MessageSquare className="w-[18px] h-[18px]" />
           </button>
-          {open === "msg" && <MsgPanel onClose={() => setOpen(null)} />}
+          {open === "msg" && <MsgPanel />}
         </div>
 
         {/* Apps */}
@@ -194,31 +207,20 @@ function PanelShell({ children, className }: { children: React.ReactNode; classN
   );
 }
 
-function MsgPanel({ onClose }: { onClose: () => void }) {
+function MsgPanel() {
   const tt = useT();
+  // There is no messaging backend yet, so show an honest empty state instead of sample messages.
   return (
     <PanelShell>
       <div className="flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--border))] -mx-2 -mt-2 mb-1 bg-gradient-to-r from-cyan2-500/10 to-brand-500/10">
-        <div>
-          <div className="font-semibold text-sm">{tt("Messages")}</div>
-          <div className="text-[10px] text-[rgb(var(--muted))]">{messages.length} {tt("messages")}</div>
-        </div>
+        <div className="font-semibold text-sm">{tt("Messages")}</div>
         <Inbox className="w-4 h-4 text-cyan2-500" />
       </div>
-      <div className="space-y-0.5">
-        {messages.map((m) => (
-          <div key={m.id} className="px-3 py-2.5 rounded-lg hover:bg-[rgb(var(--hover))] cursor-pointer">
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="font-semibold text-sm">{m.from}</div>
-              <div className="text-[10px] text-[rgb(var(--muted))]">{m.ts}</div>
-            </div>
-            <div className="text-xs text-[rgb(var(--muted))] mt-0.5 line-clamp-2">{m.body}</div>
-          </div>
-        ))}
+      <div className="px-4 py-8 text-center">
+        <Inbox className="w-8 h-8 mx-auto text-[rgb(var(--muted))] opacity-50" />
+        <div className="text-sm font-medium mt-2">{tt("No messages")}</div>
+        <div className="text-xs text-[rgb(var(--muted))] mt-1">{tt("Direct messages between team members are not available yet.")}</div>
       </div>
-      <Link href="#" onClick={onClose} className="block text-center text-xs text-brand-600 hover:underline py-2 border-t border-[rgb(var(--border))] mt-1 -mx-2 -mb-2 bg-[rgb(var(--hover))]/40">
-        {tt("View all messages")}
-      </Link>
     </PanelShell>
   );
 }
